@@ -10,7 +10,7 @@
 
 ## Overview
 
-**waterEoS** provides Python implementations of three two-state equations of state (EOS), one empirical Tait-Tammann EOS, and a two-state transport properties model for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjorn-Elsrud/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition. The Singh et al. (2017) model extends the two-state framework to predict dynamic transport properties (viscosity, self-diffusion, rotational correlation time).
+**waterEoS** provides Python implementations of three two-state equations of state (EOS), one empirical Tait-Tammann EOS, and a two-state transport properties model for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition. The Singh et al. (2017) model extends the two-state framework to predict dynamic transport properties (viscosity, self-diffusion, rotational correlation time).
 
 ## Installation
 
