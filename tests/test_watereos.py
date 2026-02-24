@@ -40,10 +40,11 @@ def test_list_models():
     from watereos import list_models
     models = list_models()
     assert isinstance(models, list)
-    assert len(models) == 5
+    assert len(models) == 6
     assert 'duska2020' in models
     assert 'caupin2019' in models
     assert 'holten2014' in models
+    assert 'grenke2025' in models
     assert 'water1' in models
     assert 'IAPWS95' in models
 
@@ -68,6 +69,7 @@ def test_case_insensitive():
     ('holten2014', 0.1),
     ('caupin2019', 0.1),
     ('duska2020', 0.1),
+    ('grenke2025', 0.1),
 ])
 def test_density_at_ambient(PT_single, model, tol):
     from watereos import getProp
@@ -99,6 +101,32 @@ def test_scatter_shape(PT_scatter, model):
     assert out.rho.shape == (3,)
     assert out.Cp.shape == (3,)
     assert out.x.shape == (3,)
+
+# ---------------------------------------------------------------------------
+# Grid/scatter mode: Grenke (no x attribute)
+# ---------------------------------------------------------------------------
+
+def test_grenke_grid_shape(PT_grid):
+    from watereos import getProp
+    out = getProp(PT_grid, 'grenke2025')
+    assert out.rho.shape == (3, 4)
+    assert out.Cp.shape == (3, 4)
+
+def test_grenke_scatter_shape(PT_scatter):
+    from watereos import getProp
+    out = getProp(PT_scatter, 'grenke2025')
+    assert out.rho.shape == (3,)
+    assert out.Cp.shape == (3,)
+
+def test_grenke_output_attributes(PT_single):
+    from watereos import getProp
+    out = getProp(PT_single, 'grenke2025')
+    for attr in ['rho', 'V', 'S', 'G', 'H', 'U', 'A', 'Cp', 'Cv',
+                 'Kt', 'Ks', 'Kp', 'alpha', 'vel']:
+        assert hasattr(out, attr), f"Missing attribute: {attr}"
+    # Grenke has no x or _A/_B properties
+    assert not hasattr(out, 'x')
+    assert not hasattr(out, 'rho_A')
 
 # ---------------------------------------------------------------------------
 # Output attributes: check all expected properties exist

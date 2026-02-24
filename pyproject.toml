@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "waterEoS"
-version = "0.1.0"
-description = "Two-state equations of state for supercooled water"
+version = "0.2.0"
+description = "Equations of state for supercooled water"
 readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.9"
@@ -30,5 +30,5 @@ Homepage = "https://github.com/anthony-consiglio/waterEoS"
 Issues = "https://github.com/anthony-consiglio/waterEoS/issues"
 
 [tool.setuptools.packages.find]
-include = ["watereos*", "duska_eos*", "caupin_eos*", "holten_eos*"]
+include = ["watereos*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*"]
 exclude = ["tests*", "examples*"]

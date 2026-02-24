@@ -8,9 +8,10 @@ Provides a single ``getProp(PT, model)`` interface that dispatches to:
   - ``'holten2014'``  -- Holten, Sengers & Anisimov (2014)
   - ``'caupin2019'``  -- Caupin & Anisimov (2019)
   - ``'duska2020'``   -- Duska (2020) EOS-VaT
+  - ``'grenke2025'``  -- Grenke & Elliott (2025) Tait-Tammann
 """
 
-_MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020']
+_MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020', 'grenke2025']
 
 # Case-insensitive lookup  ->  canonical name
 _CANONICAL = {name.lower(): name for name in _MODELS}
@@ -30,8 +31,8 @@ def getProp(PT, model):
         Pressure (MPa) and temperature (K) input, in the format used by
         SeaFreeze (``np.array([P_array, T_array], dtype=object)``).
     model : str
-        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020'.
-        Matching is case-insensitive.
+        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020',
+        'grenke2025'.  Matching is case-insensitive.
 
     Returns
     -------
@@ -63,4 +64,8 @@ def getProp(PT, model):
 
     if canonical == 'duska2020':
         from duska_eos import getProp as _gp
+        return _gp(PT)
+
+    if canonical == 'grenke2025':
+        from grenke_eos import getProp as _gp
         return _gp(PT)

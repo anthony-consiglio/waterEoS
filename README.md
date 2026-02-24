@@ -10,7 +10,7 @@
 
 ## Overview
 
-**waterEoS** provides Python implementations of three two-state equations of state (EOS) for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjorn-Elsrud/SeaFreeze)-compatible API. Each model captures the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime.
+**waterEoS** provides Python implementations of three two-state equations of state (EOS) and one empirical Tait-Tammann EOS for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjorn-Elsrud/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition.
 
 ## Installation
 
@@ -39,6 +39,7 @@ print(f"x:       {out.x[0,0]:.4f}")
 | `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 014101 (2014) | 228.2 K, 0 MPa |
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
+| `'grenke2025'` | Grenke & Elliott, J. Phys. Chem. B **129**, 1997 (2025) | -- (empirical) |
 | `'water1'` | SeaFreeze water1 (pass-through) | -- |
 | `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- |
 
@@ -51,6 +52,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'holten2014'` | T_H(P)&ndash;300 K, 0&ndash;400 MPa (extrap. to 1000 MPa) | Unbounded (any T, P) |
 | `'caupin2019'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'duska2020'` | ~200&ndash;370 K, 0&ndash;100 MPa (extrap. to 200 MPa) | Unbounded (any T, P) |
+| `'grenke2025'` | 200&ndash;300 K, 0.1&ndash;400 MPa | Unbounded (any T, P) |
 | `'water1'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 | `'IAPWS95'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 
@@ -58,6 +60,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - T_H(P) is the homogeneous ice nucleation temperature (~235 K at 0.1 MPa, ~181 K at 200 MPa).
 - Duska (2020) was fitted to data at positive pressures only; negative-pressure extrapolation is unvalidated.
 - Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
+- Grenke (2025) is a direct empirical Tait-Tammann correlation, not a two-state model. It has no `x`, `_A`, or `_B` outputs.
 - Outside the paper-stated ranges, models may return unphysical values (e.g., negative compressibility or heat capacity) without warning.
 
 ## Usage
@@ -103,6 +106,7 @@ Each model can also be imported directly:
 from duska_eos import getProp
 from caupin_eos import getProp
 from holten_eos import getProp
+from grenke_eos import getProp
 ```
 
 ### List Available Models
@@ -110,12 +114,12 @@ from holten_eos import getProp
 ```python
 from watereos import list_models
 print(list_models())
-# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020']
+# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020', 'grenke2025']
 ```
 
 ## Output Properties
 
-All three two-state models return an object with the following attributes:
+All models return an object with the following attributes (the three two-state models also include `x`, `_A`, and `_B` suffixed properties; `grenke2025` returns only the mixture properties):
 
 ### Mixture (equilibrium) properties
 
@@ -170,6 +174,7 @@ Throughput on a 100x100 = 10,000-point grid:
 | Holten (2014) | 32 ms | 317k pts/s |
 | Caupin (2019) | 18 ms | 563k pts/s |
 | Duska (2020) | 49 ms | 203k pts/s |
+| Grenke (2025) | 9 ms | 1,116k pts/s |
 
 ## References
 
@@ -179,6 +184,9 @@ Throughput on a 100x100 = 10,000-point grid:
    - Erratum: *J. Chem. Phys.* **163**, 039902 (2025). [doi:10.1063/5.0239673](https://doi.org/10.1063/5.0239673)
 
 3. M. Duska, "Water above the spinodal," *J. Chem. Phys.* **152**, 174501 (2020). [doi:10.1063/5.0006431](https://doi.org/10.1063/5.0006431)
+
+4. J. C. Grenke and J. R. Elliott, "Empirical fundamental equation of state for the metastable state of water based on the Tait-Tammann equation," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c06847](https://doi.org/10.1021/acs.jpcb.4c06847)
+   - Correction: *J. Phys. Chem. B* **129**, 9850-9853 (2025). [doi:10.1021/acs.jpcb.5c04618](https://doi.org/10.1021/acs.jpcb.5c04618)
 
 ## Authors
 
