@@ -10,7 +10,7 @@
 
 ## Overview
 
-**waterEoS** provides Python implementations of three two-state equations of state (EOS) and one empirical Tait-Tammann EOS for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjorn-Elsrud/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition.
+**waterEoS** provides Python implementations of three two-state equations of state (EOS), one empirical Tait-Tammann EOS, and a two-state transport properties model for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjorn-Elsrud/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition. The Singh et al. (2017) model extends the two-state framework to predict dynamic transport properties (viscosity, self-diffusion, rotational correlation time).
 
 ## Installation
 
@@ -40,6 +40,7 @@ print(f"x:       {out.x[0,0]:.4f}")
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
 | `'grenke2025'` | Grenke & Elliott, J. Phys. Chem. B **129**, 1997 (2025) | -- (empirical) |
+| `'singh2017'` | Singh, Issenmann & Caupin, PNAS **114**, 4312 (2017) | -- (transport) |
 | `'water1'` | SeaFreeze water1 (pass-through) | -- |
 | `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- |
 
@@ -61,6 +62,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Duska (2020) was fitted to data at positive pressures only; negative-pressure extrapolation is unvalidated.
 - Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
 - Grenke (2025) is a direct empirical Tait-Tammann correlation, not a two-state model. It has no `x`, `_A`, or `_B` outputs.
+- Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
 - Outside the paper-stated ranges, models may return unphysical values (e.g., negative compressibility or heat capacity) without warning.
 
 ## Usage
@@ -107,6 +109,7 @@ from duska_eos import getProp
 from caupin_eos import getProp
 from holten_eos import getProp
 from grenke_eos import getProp
+from singh_viscosity import getProp
 ```
 
 ### List Available Models
@@ -114,7 +117,7 @@ from grenke_eos import getProp
 ```python
 from watereos import list_models
 print(list_models())
-# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020', 'grenke2025']
+# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020', 'grenke2025', 'singh2017']
 ```
 
 ## Output Properties
@@ -150,6 +153,17 @@ Each property above (except `x`) is also available for the individual states wit
 **Total: 43 output properties** (15 mixture + 14 state A + 14 state B).
 
 All thermodynamic potentials (S, G, H, U, A) are aligned to the IAPWS-95 reference state.
+
+### Transport properties (`singh2017` only)
+
+| Attribute | Property | Units |
+|-----------|----------|-------|
+| `eta` | Dynamic viscosity | Pa·s |
+| `D` | Self-diffusion coefficient | m²/s |
+| `tau_r` | Rotational correlation time | s |
+| `f` | LDS fraction (= `x` from Holten backbone) | -- |
+
+The `singh2017` model also returns all Holten (2014) thermodynamic properties listed above.
 
 ## Phase Diagram
 
@@ -187,6 +201,8 @@ Throughput on a 100x100 = 10,000-point grid:
 
 4. J. C. Grenke and J. R. Elliott, "Empirical fundamental equation of state for the metastable state of water based on the Tait-Tammann equation," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c06847](https://doi.org/10.1021/acs.jpcb.4c06847)
    - Correction: *J. Phys. Chem. B* **129**, 9850-9853 (2025). [doi:10.1021/acs.jpcb.5c04618](https://doi.org/10.1021/acs.jpcb.5c04618)
+
+5. L. P. Singh, B. Issenmann, and F. Caupin, "Pressure dependence of viscosity in supercooled water and a unified approach for thermodynamic and dynamic anomalies of water," *Proc. Natl. Acad. Sci. U.S.A.* **114**, 4312-4317 (2017). [doi:10.1073/pnas.1619501114](https://doi.org/10.1073/pnas.1619501114)
 
 ## Authors
 
