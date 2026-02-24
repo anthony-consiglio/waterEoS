@@ -34,13 +34,31 @@ print(f"x:       {out.x[0,0]:.4f}")
 
 ## Available Models
 
-| Model key | Reference | LLCP (T, P) | Valid range |
-|-----------|-----------|-------------|-------------|
-| `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 014101 (2014) | 228.2 K, 0 MPa | 200-360 K, -400-400 MPa |
-| `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa | 200-360 K, -200-400 MPa |
-| `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa | 235-360 K, -100-400 MPa |
-| `'water1'` | SeaFreeze water1 (pass-through) | -- | 240-501 K, 0-2300 MPa |
-| `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- | 240-501 K, 0-2300 MPa |
+| Model key | Reference | LLCP (T, P) |
+|-----------|-----------|-------------|
+| `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 014101 (2014) | 228.2 K, 0 MPa |
+| `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
+| `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
+| `'water1'` | SeaFreeze water1 (pass-through) | -- |
+| `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- |
+
+### Validity Ranges
+
+The three two-state models accept **any** (T, P) input without raising errors, but results are only physically meaningful within the ranges below. The "paper-stated" range is where each model was validated by its authors; the "code-accessible" range is where the code runs without numerical failure (though results outside the paper range may be unphysical).
+
+| Model | Paper-stated validity | Code-accessible range |
+|-------|----------------------|-----------------------|
+| `'holten2014'` | T_H(P)&ndash;300 K, 0&ndash;400 MPa (extrap. to 1000 MPa) | Unbounded (any T, P) |
+| `'caupin2019'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
+| `'duska2020'` | ~200&ndash;370 K, 0&ndash;100 MPa (extrap. to 200 MPa) | Unbounded (any T, P) |
+| `'water1'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
+| `'IAPWS95'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
+
+**Notes:**
+- T_H(P) is the homogeneous ice nucleation temperature (~235 K at 0.1 MPa, ~181 K at 200 MPa).
+- Duska (2020) was fitted to data at positive pressures only; negative-pressure extrapolation is unvalidated.
+- Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
+- Outside the paper-stated ranges, models may return unphysical values (e.g., negative compressibility or heat capacity) without warning.
 
 ## Usage
 
