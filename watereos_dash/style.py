@@ -5,11 +5,49 @@ Provides palette/colormap options, default settings, layout builders,
 and phase-diagram trace generators — all Plotly-native (no matplotlib).
 """
 
-from watereos_gui.utils.plot_style import PALETTE_OPTIONS as _MPL_PALETTES
-from watereos_gui.utils.model_registry import MODEL_ORDER
+# Palette and model data inlined to avoid importing watereos_gui (which
+# depends on matplotlib / PyQt6 — not available in the web deployment).
 
-# Re-export for convenience
-PALETTE_OPTIONS = dict(_MPL_PALETTES)
+PALETTE_OPTIONS = {
+    'Seaborn Deep': [
+        '#4c72b0', '#dd8452', '#55a868', '#c44e52',
+        '#8172b3', '#937860', '#da8bc3',
+    ],
+    'Seaborn Muted': [
+        '#4878d0', '#ee854a', '#6acc64', '#d65f5f',
+        '#956cb4', '#8c613c', '#dc7ec0',
+    ],
+    'Seaborn Bright': [
+        '#023eff', '#ff7c00', '#1ac938', '#e8000b',
+        '#8b2be2', '#9f4800', '#f14cc1',
+    ],
+    'Seaborn Colorblind': [
+        '#0173b2', '#de8f05', '#029e73', '#d55e00',
+        '#cc78bc', '#ca9161', '#fbafe4',
+    ],
+    'Tab10': [
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+        '#9467bd', '#8c564b', '#e377c2',
+    ],
+    'Nature': [
+        '#E64B35', '#4DBBD5', '#00A087', '#3C5488',
+        '#F39B7F', '#8491B4', '#91D1C2',
+    ],
+    'Science': [
+        '#0C5DA5', '#00B945', '#FF9500', '#FF2C00',
+        '#845B97', '#474747', '#9E9E9E',
+    ],
+    'Biostasis': [
+        '#F53A33', '#4DBEEE', '#7ED957', '#DAD4CE',
+        '#C77DFF', '#FFB347', '#FF6B9D',
+    ],
+}
+
+MODEL_ORDER = [
+    'duska2020', 'holten2014', 'caupin2019',
+    'grenke2025', 'singh2017',
+    'water1', 'IAPWS95',
+]
 
 # Plotly colorscale names (lowercase) — mapped from matplotlib equivalents
 CMAP_OPTIONS = [
