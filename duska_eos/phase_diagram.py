@@ -250,7 +250,13 @@ def compute_spinodal_curve(p_range_MPa=None, n_pressures=150):
     llcp = find_LLCP()
 
     if p_range_MPa is None:
-        p_range_MPa = np.linspace(llcp['p_MPa'] + 0.5, 200.0, n_pressures)
+        p_llcp = llcp['p_MPa']
+        # Dense near LLCP (0.05 MPa steps for first 5 MPa), sparser beyond
+        n_near = min(n_pressures // 3, 100)
+        n_far = n_pressures - n_near
+        p_near = np.linspace(p_llcp + 0.05, p_llcp + 5.0, n_near, endpoint=False)
+        p_far = np.linspace(p_llcp + 5.0, 200.0, n_far)
+        p_range_MPa = np.concatenate([p_near, p_far])
 
     T_upper, T_lower = [], []
     x_lo_up, x_hi_up = [], []
@@ -405,7 +411,12 @@ def compute_phase_diagram(p_range_MPa=None, n_pressures=150):
     llcp = find_LLCP()
 
     if p_range_MPa is None:
-        p_range_MPa = np.linspace(llcp['p_MPa'] + 0.5, 200.0, n_pressures)
+        p_llcp = llcp['p_MPa']
+        n_near = min(n_pressures // 3, 100)
+        n_far = n_pressures - n_near
+        p_near = np.linspace(p_llcp + 0.05, p_llcp + 5.0, n_near, endpoint=False)
+        p_far = np.linspace(p_llcp + 5.0, 200.0, n_far)
+        p_range_MPa = np.concatenate([p_near, p_far])
 
     spinodal = compute_spinodal_curve(p_range_MPa, n_pressures)
     binodal = compute_binodal_curve(p_range_MPa, n_pressures)

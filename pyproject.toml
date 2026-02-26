@@ -25,10 +25,25 @@ dependencies = [
     "SeaFreeze>=0.9",
 ]
 
+[project.optional-dependencies]
+gui = ["PyQt6>=6.5", "matplotlib>=3.7"]
+web = [
+    "dash>=2.14",
+    "dash-bootstrap-components>=1.5",
+    "plotly>=5.18",
+    "gunicorn>=21.2",
+]
+
+[project.scripts]
+watereos-gui = "watereos_gui.app:main"
+
 [project.urls]
 Homepage = "https://github.com/anthony-consiglio/waterEoS"
 Issues = "https://github.com/anthony-consiglio/waterEoS/issues"
 
 [tool.setuptools.packages.find]
-include = ["watereos*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*"]
+include = ["watereos*", "watereos_gui*", "watereos_dash*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*"]
 exclude = ["tests*", "examples*"]
+
+[tool.setuptools.package-data]
+"watereos_dash" = ["assets/**/*"]
