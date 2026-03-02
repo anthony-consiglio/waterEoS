@@ -57,8 +57,6 @@ binding = "PyO3"
 optional = true
 
 [tool.maturin]
-python-source = "."
-module-name = "watereos_rs"
 python-packages = [
     "watereos", "watereos_ad",
     "caupin_eos", "duska_eos", "holten_eos", "grenke_eos",
