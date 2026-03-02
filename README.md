@@ -10,13 +10,34 @@
 
 ## Overview
 
-**waterEoS** provides Python implementations of three two-state equations of state (EOS), one empirical Tait-Tammann EOS, and a two-state transport properties model for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. The two-state models capture the thermodynamic anomalies of water by treating it as a mixture of two interconvertible local structures (low-density/tetrahedral and high-density/disordered), predicting a liquid-liquid critical point (LLCP) in the deeply supercooled regime. The Grenke & Elliott (2025) Tait-Tammann model is a direct empirical correlation without two-state decomposition. The Singh et al. (2017) model extends the two-state framework to predict dynamic transport properties (viscosity, self-diffusion, rotational correlation time).
+**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It unifies five equation-of-state models under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API.
+
+### Two-state equations of state
+
+Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich). waterEoS implements three such models:
+
+- **Holten, Sengers & Anisimov (2014)** -- The foundational two-state EOS for supercooled water. Uses a Gibbs-energy (pressure-additive) mixing rule, fitted to experimental data at positive pressures up to 400 MPa. Places the LLCP at 228 K, 0 MPa.
+- **Caupin & Anisimov (2019)** -- Extends the two-state framework to negative pressures (stretched water), connecting the liquid-liquid spinodal to the liquid-vapor spinodal in a unified description. Places the LLCP at 218 K, 72 MPa.
+- **Duska (2020)** -- Uses a volume-additive mixing rule (rather than Gibbs-energy mixing), yielding an explicit equation of state in volume and temperature ("EOS-VaT"). Fitted over a broader temperature range up to 370 K. Places the LLCP at 221 K, 54 MPa.
+
+All three return 43 thermodynamic properties: 15 mixture properties, 14 per state (A and B), plus the tetrahedral fraction *x*.
+
+### Additional models
+
+- **Grenke & Elliott (2025)** -- An empirical Tait-Tammann correlation for supercooled water (not a two-state model). Returns standard thermodynamic properties without per-state decomposition.
+- **Singh, Issenmann & Caupin (2017)** -- A two-state transport model that predicts viscosity, self-diffusion coefficient, and rotational correlation time. Uses Holten (2014) as its thermodynamic backbone.
+
+### Performance
+
+The three two-state models and the Grenke model include a compiled **Rust backend** (via PyO3) that is 2-5x faster than the pure Python fallback. Pre-built wheels for Linux, macOS, and Windows are available on PyPI; the Rust backend is selected automatically when present.
 
 ## Installation
 
 ```bash
 pip install waterEoS
 ```
+
+Pre-built wheels for Linux (x86_64, aarch64), macOS (Intel, Apple Silicon), and Windows include the compiled Rust backend automatically. On other platforms, pip installs from source with a pure Python fallback.
 
 ## Quick Start
 
@@ -30,6 +51,21 @@ out = getProp(PT, 'duska2020')
 print(f"Density: {out.rho[0,0]:.2f} kg/m³")
 print(f"Cp:      {out.Cp[0,0]:.1f} J/(kg·K)")
 print(f"x:       {out.x[0,0]:.4f}")
+```
+
+### Simple API
+
+For quick calculations without constructing SeaFreeze-style arrays, use `compute()`:
+
+```python
+from watereos import compute
+
+out = compute(T_K=300, P_MPa=0.1, model='caupin2019')
+print(f"Density: {out.rho[0,0]:.2f} kg/m³")
+
+# Also accepts arrays (evaluates on the full P x T grid)
+out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
+# out.rho has shape (3, 3)
 ```
 
 ## Available Models
@@ -55,6 +91,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'duska2020'` | ~200&ndash;370 K, 0&ndash;100 MPa (extrap. to 200 MPa) | Unbounded (any T, P) |
 | `'grenke2025'` | 200&ndash;300 K, 0.1&ndash;400 MPa | Unbounded (any T, P) |
 | `'water1'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
+| `'singh2017'` | 200&ndash;300 K, 0&ndash;400 MPa (matches Holten backbone) | Unbounded (any T, P) |
 | `'IAPWS95'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 
 **Notes:**
@@ -63,7 +100,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
 - Grenke (2025) is a direct empirical Tait-Tammann correlation, not a two-state model. It has no `x`, `_A`, or `_B` outputs.
 - Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
-- Outside the paper-stated ranges, models may return unphysical values (e.g., negative compressibility or heat capacity) without warning.
+- `getProp()` and `compute()` issue a `UserWarning` when inputs fall outside the suggested validity range. Results outside these ranges may be unphysical (e.g., negative compressibility or heat capacity).
 
 ## Usage
 
@@ -181,14 +218,17 @@ Available functions: `find_LLCP()`, `compute_spinodal_curve()`, `compute_binodal
 
 ## Performance
 
-Throughput on a 100x100 = 10,000-point grid:
+Throughput on a 10,000-point grid (100 pressures x 100 temperatures):
 
-| Model | Time | Throughput |
-|-------|------|-----------|
-| Holten (2014) | 32 ms | 317k pts/s |
-| Caupin (2019) | 18 ms | 563k pts/s |
-| Duska (2020) | 49 ms | 203k pts/s |
-| Grenke (2025) | 9 ms | 1,116k pts/s |
+| Model | Rust | Python | Speedup |
+|-------|------|--------|---------|
+| Holten (2014) | 15 ms (678k pts/s) | 34 ms (294k pts/s) | 2.3x |
+| Caupin (2019) | 5 ms (1,853k pts/s) | 18 ms (572k pts/s) | 3.2x |
+| Duska (2020) | 10 ms (1,040k pts/s) | 52 ms (193k pts/s) | 5.4x |
+| Grenke (2025) | 4 ms (2,418k pts/s) | -- | -- |
+| Singh (2017) | 32 ms (309k pts/s) | -- | -- |
+
+The Rust backend is used automatically when installed (included in pre-built wheels). Pure Python is used as a fallback.
 
 ## References
 
