@@ -1,0 +1,12 @@
+[package]
+name = "watereos_rs"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+name = "watereos_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py39"] }
+numpy = "0.24"

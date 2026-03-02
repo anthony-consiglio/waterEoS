@@ -1,4 +1,4 @@
-from . import property_explorer, phase_diagram, model_comparison, point_calculator, settings
+from . import property_explorer, phase_diagram, model_comparison, point_calculator, settings, h2o_phase_diagram
 
 
 def register_all(app):
@@ -8,3 +8,4 @@ def register_all(app):
     model_comparison.register(app)
     point_calculator.register(app)
     settings.register(app)
+    h2o_phase_diagram.register(app)

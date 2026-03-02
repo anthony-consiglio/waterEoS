@@ -651,8 +651,10 @@ def compute_batch(T_K, p_MPa):
     Kap = kap_mix / (P.rho0 * P.R * P.Tc)
     Alp = alp_mix / P.Tc
     Cp = P.R * cp_mix
-    Cv = Cp - T_K * Alp**2 / (rho * Kap)
-    kap_S = Kap - T_K * V * Alp**2 / Cp
+    Cv = np.where((Kap > 0) & np.isfinite(Kap),
+                  Cp - T_K * Alp**2 / (rho * Kap), Cp)
+    kap_S = np.where((Cp > 0) & np.isfinite(Cp),
+                     Kap - T_K * V * Alp**2 / Cp, Kap)
     vel = np.where((rho > 0) & (kap_S > 0),
                    np.sqrt(np.maximum(1.0 / (rho * kap_S), 0.0)), np.nan)
     Kt = np.where((Kap > 0) & np.isfinite(Kap), 1.0 / Kap / 1e6, np.inf)

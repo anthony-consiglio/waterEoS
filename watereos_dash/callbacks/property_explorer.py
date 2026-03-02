@@ -476,13 +476,17 @@ def _compute_phase_curves(model_key, prop_key, isobar_mode):
     info = MODEL_REGISTRY[model_key]
     traces = []
 
-    # Spinodal branches
+    # Spinodal branches — one metastable composition per T-branch.
+    # At T_upper the metastable LDL (x_hi) vanishes; at T_lower the
+    # metastable HDL (x_lo) vanishes.  Each branch corresponds to one
+    # binodal branch: equilibrium → cross binodal → metastable → spinodal.
     if 'spinodal' in pd_data:
         sp = pd_data['spinodal']
         p_arr = np.asarray(sp['p_array'])
-        for branch_key, x_key, show_label in [
-            ('T_upper', 'x_hi_upper', True),
-            ('T_lower', 'x_lo_lower', False),
+        first_spinodal = True
+        for branch_key, x_key in [
+            ('T_upper', 'x_hi_upper'),   # metastable LDL at upper spinodal
+            ('T_lower', 'x_lo_lower'),   # metastable HDL at lower spinodal
         ]:
             T_branch = np.asarray(sp[branch_key])
             valid = (np.isfinite(T_branch)
@@ -498,22 +502,24 @@ def _compute_phase_curves(model_key, prop_key, isobar_mode):
                 prop_vals = compute_property_at_forced_x(
                     model_key, prop_key, T_b, P_b, x_sp[valid])
             if prop_vals is None or np.all(np.isnan(prop_vals)):
-                prop_vals = _compute_along_curve(model_key, prop_key, T_b, P_b)
+                prop_vals = _compute_along_curve(
+                    model_key, prop_key, T_b, P_b)
 
-            T_b, P_b, prop_vals = _extend_to_llcp(
+            Te, Pe, br = _extend_to_llcp(
                 T_b, P_b, prop_vals, pd_data, model_key, prop_key)
 
-            x_vals = T_b if isobar_mode else P_b
-            mask = np.isfinite(prop_vals)
+            x_vals = Te if isobar_mode else Pe
+            mask = np.isfinite(br)
             traces.append({
                 'x': x_vals[mask].tolist(),
-                'y': prop_vals[mask].tolist(),
+                'y': br[mask].tolist(),
                 'type': 'spinodal',
-                'name': 'Spinodal' if show_label else None,
-                'show_legend': show_label,
+                'name': 'Spinodal' if first_spinodal else None,
+                'show_legend': first_spinodal,
             })
+            first_spinodal = False
 
-    # Binodal dome
+    # Binodal dome — use forced x_lo / x_hi compositions
     if 'binodal' in pd_data:
         bn = pd_data['binodal']
         p_arr = np.asarray(bn['p_array'])
@@ -523,12 +529,19 @@ def _compute_phase_curves(model_key, prop_key, isobar_mode):
                  & (T_bn <= info.T_max + 10))
         if np.any(valid) and not prop_key.endswith(('_A', '_B')):
             T_b, P_b = T_bn[valid], p_arr[valid]
-            eps = 0.1
-            prop_hi = _compute_along_curve(model_key, prop_key, T_b + eps, P_b)
-            prop_lo = _compute_along_curve(model_key, prop_key, T_b - eps, P_b)
-            for branch, lbl in [(prop_lo, 'Binodal'), (prop_hi, None)]:
+            x_lo_arr = np.asarray(bn.get('x_lo', []))
+            x_hi_arr = np.asarray(bn.get('x_hi', []))
+            for x_arr, lbl in [(x_lo_arr, 'Binodal'), (x_hi_arr, None)]:
+                prop_vals = None
+                if x_arr.size == p_arr.size:
+                    prop_vals = compute_property_at_forced_x(
+                        model_key, prop_key, T_b, P_b, x_arr[valid])
+                if prop_vals is None or np.all(np.isnan(prop_vals)):
+                    # Fallback to equilibrium evaluation
+                    prop_vals = _compute_along_curve(
+                        model_key, prop_key, T_b, P_b)
                 Te, Pe, br = _extend_to_llcp(
-                    T_b, P_b, branch, pd_data, model_key, prop_key)
+                    T_b, P_b, prop_vals, pd_data, model_key, prop_key)
                 x_vals = Te if isobar_mode else Pe
                 mask = np.isfinite(br)
                 traces.append({
@@ -596,12 +609,14 @@ def _compute_phase_3d(model_key, prop_key):
     info = MODEL_REGISTRY[model_key]
     traces = []
 
-    # Spinodal
+    # Spinodal — one metastable composition per T-branch (see _compute_phase_curves)
     if 'spinodal' in pd_data:
         sp = pd_data['spinodal']
         p_arr = np.asarray(sp['p_array'])
-        for branch_key, x_key, show_label in [
-            ('T_upper', 'x_hi_upper', True), ('T_lower', 'x_lo_lower', False)
+        first_spinodal = True
+        for branch_key, x_key in [
+            ('T_upper', 'x_hi_upper'),   # metastable LDL at upper spinodal
+            ('T_lower', 'x_lo_lower'),   # metastable HDL at lower spinodal
         ]:
             T_branch = np.asarray(sp[branch_key])
             valid = (np.isfinite(T_branch)
@@ -616,20 +631,22 @@ def _compute_phase_3d(model_key, prop_key):
                 prop_vals = compute_property_at_forced_x(
                     model_key, prop_key, T_b, P_b, x_sp[valid])
             if prop_vals is None or np.all(np.isnan(prop_vals)):
-                prop_vals = _compute_along_curve(model_key, prop_key, T_b, P_b)
-            T_b, P_b, prop_vals = _extend_to_llcp(
+                prop_vals = _compute_along_curve(
+                    model_key, prop_key, T_b, P_b)
+            Te, Pe, br = _extend_to_llcp(
                 T_b, P_b, prop_vals, pd_data, model_key, prop_key)
-            mask = np.isfinite(prop_vals)
+            mask = np.isfinite(br)
             traces.append({
-                'T': T_b[mask].tolist(),
-                'P': P_b[mask].tolist(),
-                'prop': prop_vals[mask].tolist(),
+                'T': Te[mask].tolist(),
+                'P': Pe[mask].tolist(),
+                'prop': br[mask].tolist(),
                 'type': 'spinodal',
-                'name': 'Spinodal' if show_label else None,
-                'show_legend': show_label,
+                'name': 'Spinodal' if first_spinodal else None,
+                'show_legend': first_spinodal,
             })
+            first_spinodal = False
 
-    # Binodal dome
+    # Binodal dome — use forced x_lo / x_hi compositions
     if 'binodal' in pd_data:
         bn = pd_data['binodal']
         p_arr = np.asarray(bn['p_array'])
@@ -639,12 +656,18 @@ def _compute_phase_3d(model_key, prop_key):
                  & (T_bn <= info.T_max + 10))
         if np.any(valid) and not prop_key.endswith(('_A', '_B')):
             T_b, P_b = T_bn[valid], p_arr[valid]
-            eps = 0.1
-            prop_hi = _compute_along_curve(model_key, prop_key, T_b + eps, P_b)
-            prop_lo = _compute_along_curve(model_key, prop_key, T_b - eps, P_b)
-            for branch, lbl in [(prop_lo, 'Binodal'), (prop_hi, None)]:
+            x_lo_arr = np.asarray(bn.get('x_lo', []))
+            x_hi_arr = np.asarray(bn.get('x_hi', []))
+            for x_arr, lbl in [(x_lo_arr, 'Binodal'), (x_hi_arr, None)]:
+                prop_vals = None
+                if x_arr.size == p_arr.size:
+                    prop_vals = compute_property_at_forced_x(
+                        model_key, prop_key, T_b, P_b, x_arr[valid])
+                if prop_vals is None or np.all(np.isnan(prop_vals)):
+                    prop_vals = _compute_along_curve(
+                        model_key, prop_key, T_b, P_b)
                 Te, Pe, br = _extend_to_llcp(
-                    T_b, P_b, branch, pd_data, model_key, prop_key)
+                    T_b, P_b, prop_vals, pd_data, model_key, prop_key)
                 mask = np.isfinite(br)
                 traces.append({
                     'T': Te[mask].tolist(),

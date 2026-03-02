@@ -4,6 +4,8 @@ from .phase_diagram import (
     compute_spinodal_curve,
     compute_binodal_curve,
     compute_phase_diagram,
+    compute_tmd_temperature,
+    compute_kauzmann_temperature,
 )
 
 __all__ = [
@@ -12,4 +14,6 @@ __all__ = [
     'compute_spinodal_curve',
     'compute_binodal_curve',
     'compute_phase_diagram',
+    'compute_tmd_temperature',
+    'compute_kauzmann_temperature',
 ]

@@ -20,12 +20,7 @@ Usage (identical to SeaFreeze and other *_eos modules):
 
 import numpy as np
 from .core import compute_properties, compute_batch
-
-
-class ThermodynamicStates:
-    """Container for thermodynamic output, accessed via attributes."""
-    pass
-
+from watereos._common import ThermodynamicStates, _is_grid_input
 
 _KEYS = [
     'rho', 'V', 'S', 'G', 'H', 'U', 'A',
@@ -34,17 +29,6 @@ _KEYS = [
 
 # Keys returned by compute_batch (all except Kp)
 _BATCH_KEYS = [k for k in _KEYS if k != 'Kp']
-
-
-def _is_grid_input(PT):
-    """Detect whether PT is grid format or scatter format."""
-    if PT.dtype == object and len(PT) == 2:
-        try:
-            if hasattr(PT[0], '__len__') and not isinstance(PT[0], tuple):
-                return True
-        except (TypeError, IndexError):
-            pass
-    return False
 
 
 def getProp(PT, phase=None):
@@ -88,12 +72,9 @@ def getProp(PT, phase=None):
 
     else:
         N = len(PT)
-        T_flat = np.empty(N)
-        P_flat = np.empty(N)
-        for i in range(N):
-            point = PT[i]
-            P_flat[i] = float(point[0])
-            T_flat[i] = float(point[1])
+        pairs = np.array(PT.tolist(), dtype=float)
+        P_flat = pairs[:, 0]
+        T_flat = pairs[:, 1]
 
         batch = compute_batch(T_flat, P_flat)
 

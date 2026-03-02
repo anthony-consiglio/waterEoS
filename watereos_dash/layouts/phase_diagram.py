@@ -30,11 +30,22 @@ def layout():
         dcc.Checklist(
             id='pd-show',
             options=[
-                {'label': ' Binodal', 'value': 'binodal'},
-                {'label': ' Spinodal', 'value': 'spinodal'},
+                {'label': ' LL Binodal', 'value': 'binodal'},
+                {'label': ' HDL Spinodal', 'value': 'hdl_spinodal'},
+                {'label': ' LDL Spinodal', 'value': 'ldl_spinodal'},
                 {'label': ' LLCP', 'value': 'LLCP'},
+                {'label': ' TMD', 'value': 'tmd'},
+                {'label': ' Widom line', 'value': 'widom'},
+                {'label': ' Ice Ih liquidus', 'value': 'ice_ih'},
+                {'label': ' Ice III liquidus', 'value': 'ice_iii'},
+                {'label': ' Ih nucleation', 'value': 'nuc_ih'},
+                {'label': ' III nucleation', 'value': 'nuc_iii'},
+                {'label': ' HDL Kauzmann', 'value': 'kauzmann_hdl'},
+                {'label': ' LDL Kauzmann', 'value': 'kauzmann_ldl'},
             ],
-            value=['binodal', 'spinodal', 'LLCP'],
+            value=['binodal', 'hdl_spinodal', 'ldl_spinodal', 'LLCP',
+                   'tmd', 'widom', 'ice_ih', 'ice_iii', 'nuc_ih',
+                   'nuc_iii', 'kauzmann_hdl', 'kauzmann_ldl'],
             style={'marginBottom': '12px'},
         ),
 
@@ -42,7 +53,7 @@ def layout():
         dcc.Checklist(
             id='pd-auto-limits',
             options=[{'label': ' Auto limits', 'value': 'auto'}],
-            value=['auto'],
+            value=[],
             style={'marginBottom': '8px'},
         ),
 
@@ -50,19 +61,19 @@ def layout():
         html.Div(id='pd-manual-limits', children=[
             html.Div(className='control-label', children='Temperature Range (K)'),
             dbc.Row([
-                dbc.Col(dcc.Input(id='pd-tmin', type='number', value=_info.T_min,
+                dbc.Col(dcc.Input(id='pd-tmin', type='number', value=150,
                                   debounce=True, style={'width': '100%'}), width=6),
-                dbc.Col(dcc.Input(id='pd-tmax', type='number', value=_info.T_max,
+                dbc.Col(dcc.Input(id='pd-tmax', type='number', value=300,
                                   debounce=True, style={'width': '100%'}), width=6),
             ], className='g-1'),
             html.Div(className='control-label', children='Pressure Range (MPa)'),
             dbc.Row([
-                dbc.Col(dcc.Input(id='pd-pmin', type='number', value=_info.P_min,
+                dbc.Col(dcc.Input(id='pd-pmin', type='number', value=0,
                                   debounce=True, style={'width': '100%'}), width=6),
-                dbc.Col(dcc.Input(id='pd-pmax', type='number', value=_info.P_max,
+                dbc.Col(dcc.Input(id='pd-pmax', type='number', value=300,
                                   debounce=True, style={'width': '100%'}), width=6),
             ], className='g-1'),
-        ], style={'display': 'none'}),
+        ], style={'display': 'block'}),
 
         html.Button('Compute', id='pd-compute', className='btn-primary',
                      n_clicks=0, style={'marginTop': '12px'}),

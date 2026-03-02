@@ -1,4 +1,4 @@
-"""Tab 2: Phase Diagram — callbacks."""
+"""Tab: EoS Phase Diagram — callbacks."""
 
 import numpy as np
 import plotly.graph_objects as go
@@ -6,11 +6,55 @@ from dash import Input, Output, State, no_update
 
 from watereos_gui.utils.model_registry import MODEL_REGISTRY
 from watereos_gui.backend.computation import compute_phase_diagram_data
-from watereos_dash.style import make_layout, get_phase_traces, DEFAULTS
+from watereos_dash.style import make_layout, DEFAULTS
+
+
+# Curve styling matching Caupin & Anisimov 2019 reference figure
+_CURVE_STYLES = {
+    'binodal':       dict(color='#9333ea', dash='solid', width=2),    # purple
+    'hdl_spinodal':  dict(color='#ec4899', dash='dash', width=2),     # magenta
+    'ldl_spinodal':  dict(color='#ec4899', dash='dash', width=2),     # magenta
+    'tmd':           dict(color='#ffffff', dash='dash', width=2),     # white
+    'widom':         dict(color='#f97316', dash='dashdot', width=2),  # orange
+    'ice_ih':        dict(color='#3b82f6', dash='solid', width=2),    # blue
+    'ice_iii':       dict(color='#ef4444', dash='solid', width=2),    # red
+    'nuc_ih':        dict(color='#9ca3af', dash='solid', width=1.5),  # gray
+    'nuc_iii':       dict(color='#9ca3af', dash='dash', width=1.5),   # gray dashed
+    'kauzmann_hdl':  dict(color='#22c55e', dash='solid', width=2),    # green
+    'kauzmann_ldl':  dict(color='#16a34a', dash='dash', width=2),     # dark green dashed
+}
+
+_CURVE_LABELS = {
+    'binodal':       'LL binodal (LLTL)',
+    'hdl_spinodal':  'HDL spinodal',
+    'ldl_spinodal':  'LDL spinodal',
+    'tmd':           'Density maximum (TMD)',
+    'widom':         'Widom line (Cp max)',
+    'ice_ih':        'Ice Ih liquidus',
+    'ice_iii':       'Ice III liquidus',
+    'nuc_ih':        'Ih nucleation (Holten)',
+    'nuc_iii':       'III nucleation (Holten)',
+    'kauzmann_hdl':  'HDL Kauzmann temperature',
+    'kauzmann_ldl':  'LDL Kauzmann temperature',
+}
+
+# Map show-checklist value -> data key in pd_data
+_SHOW_TO_DATA = {
+    'binodal':       'binodal',
+    'hdl_spinodal':  'hdl_spinodal',
+    'ldl_spinodal':  'ldl_spinodal',
+    'tmd':           'tmd',
+    'widom':         'widom',
+    'ice_ih':        'ice_ih_liquidus',
+    'ice_iii':       'ice_iii_liquidus',
+    'nuc_ih':        'nucleation_ih',
+    'nuc_iii':       'nucleation_iii',
+    'kauzmann_hdl':  'kauzmann_hdl',
+    'kauzmann_ldl':  'kauzmann_ldl',
+}
 
 
 def register(app):
-    # Toggle manual limits visibility
     @app.callback(
         Output('pd-manual-limits', 'style'),
         Input('pd-auto-limits', 'value'),
@@ -21,7 +65,6 @@ def register(app):
             return {'display': 'none'}
         return {'display': 'block'}
 
-    # Compute phase diagram and store data
     @app.callback(
         [Output('pd-store', 'data'),
          Output('pd-status', 'children')],
@@ -34,13 +77,12 @@ def register(app):
             return no_update, ''
         try:
             pd_data = compute_phase_diagram_data(model_key)
-            # Convert numpy arrays to lists for JSON serialization
             serializable = _serialize_pd(pd_data)
+            serializable['_model_key'] = model_key
             return serializable, f'Computed for {MODEL_REGISTRY[model_key].display_name}'
         except Exception as e:
             return no_update, f'Error: {e}'
 
-    # Replot from stored data (fast — no recompute)
     @app.callback(
         Output('pd-graph', 'figure'),
         [Input('pd-store', 'data'),
@@ -59,54 +101,75 @@ def register(app):
 
         settings = settings or DEFAULTS
         show = show or []
-
-        # Deserialize arrays
         pd_native = _deserialize_pd(pd_data)
+
+        model_key = pd_data.get('_model_key', '')
+        model_name = MODEL_REGISTRY.get(model_key, None)
+        title = (f'Water Phase Diagram ({model_name.display_name})'
+                 if model_name else 'Water Phase Diagram')
 
         fig = go.Figure()
 
-        # Filter traces based on show checklist
-        plw = settings.get('phase_line_width', DEFAULTS['phase_line_width'])
-        spinodal_color = settings.get('spinodal_color', DEFAULTS['spinodal_color'])
-        binodal_color = settings.get('binodal_color', DEFAULTS['binodal_color'])
-        llcp_color = settings.get('llcp_color', DEFAULTS['llcp_color'])
+        # --- Line curves ---
+        for show_key, data_key in _SHOW_TO_DATA.items():
+            if show_key not in show:
+                continue
+            d = pd_native.get(data_key)
+            if d is None or 'T_K' not in d or 'p_MPa' not in d:
+                continue
+            T = np.asarray(d['T_K'])
+            P = np.asarray(d['p_MPa'])
+            if T.size == 0:
+                continue
 
-        if 'spinodal' in show and 'spinodal' in pd_native and pd_native['spinodal']:
-            sp = pd_native['spinodal']
+            style = _CURVE_STYLES[show_key]
+            label = _CURVE_LABELS[show_key]
+
             fig.add_trace(go.Scatter(
-                x=sp['T_K'], y=sp['p_MPa'],
-                mode='lines', name='Spinodal',
-                line=dict(color=spinodal_color, width=plw, dash='dash'),
-                hovertemplate='T=%{x:.2f} K<br>P=%{y:.2f} MPa<extra>Spinodal</extra>',
+                x=T, y=P,
+                mode='lines',
+                name=label,
+                line=dict(color=style['color'], width=style['width'],
+                          dash=style['dash']),
+                hovertemplate=(f'{label}<br>T=%{{x:.2f}} K<br>'
+                               f'P=%{{y:.2f}} MPa<extra></extra>'),
             ))
 
-        if 'binodal' in show and 'binodal' in pd_native and pd_native['binodal']:
-            bn = pd_native['binodal']
-            fig.add_trace(go.Scatter(
-                x=bn['T_K'], y=bn['p_MPa'],
-                mode='lines', name='Binodal',
-                line=dict(color=binodal_color, width=plw),
-                hovertemplate='T=%{x:.2f} K<br>P=%{y:.2f} MPa<extra>Binodal</extra>',
-            ))
+        # --- LLCP marker ---
+        if 'LLCP' in show:
+            llcp = pd_native.get('LLCP')
+            if llcp and 'T_K' in llcp and 'p_MPa' in llcp:
+                T_c = float(llcp['T_K'])
+                P_c = float(llcp['p_MPa'])
+                fig.add_trace(go.Scatter(
+                    x=[T_c], y=[P_c],
+                    mode='markers',
+                    name=f'LLCP ({T_c:.1f} K, {P_c:.1f} MPa)',
+                    marker=dict(color='#9333ea', size=12, symbol='circle',
+                                line=dict(width=1, color='white')),
+                    hovertemplate=(f'LLCP<br>T={T_c:.2f} K<br>'
+                                   f'P={P_c:.2f} MPa<extra></extra>'),
+                ))
 
-        if 'LLCP' in show and 'LLCP' in pd_native and pd_native['LLCP']:
-            llcp = pd_native['LLCP']
-            T_c = float(llcp['T_K'])
-            P_c = float(llcp['p_MPa'])
+        # --- Triple point marker ---
+        tp = pd_native.get('triple_point')
+        if tp and ('ice_ih' in show or 'ice_iii' in show):
+            T_tp = float(tp['T_K'])
+            P_tp = float(tp['p_MPa'])
             fig.add_trace(go.Scatter(
-                x=[T_c], y=[P_c],
+                x=[T_tp], y=[P_tp],
                 mode='markers',
-                name=f'LLCP ({T_c:.1f} K, {P_c:.1f} MPa)',
-                marker=dict(color=llcp_color, size=10, symbol='circle',
+                name=f'Ih/III/liq triple pt ({T_tp:.1f} K, {P_tp:.0f} MPa)',
+                marker=dict(color='#166534', size=12, symbol='square',
                             line=dict(width=1, color='white')),
-                hovertemplate=f'LLCP<br>T={T_c:.2f} K<br>P={P_c:.2f} MPa<extra></extra>',
+                hovertemplate=(f'Ih/III/liq triple pt<br>T={T_tp:.2f} K<br>'
+                               f'P={P_tp:.2f} MPa<extra></extra>'),
             ))
 
-        layout = make_layout(settings, title='Phase Diagram (T–P)',
+        layout = make_layout(settings, title=title,
                              xaxis_title='Temperature [K]',
                              yaxis_title='Pressure [MPa]')
 
-        # Apply manual limits if auto is unchecked
         if 'auto' not in (auto_limits or []):
             try:
                 layout['xaxis']['range'] = [float(tmin), float(tmax)]
@@ -117,7 +180,6 @@ def register(app):
         fig.update_layout(**layout)
         return fig
 
-    # Click on plot → send (T, P) to shared store for Point Calculator
     @app.callback(
         Output('clicked-point-store', 'data'),
         Input('pd-graph', 'clickData'),
@@ -133,7 +195,7 @@ def register(app):
 def _empty_figure(settings=None):
     settings = settings or DEFAULTS
     fig = go.Figure()
-    layout = make_layout(settings, title='Phase Diagram (T–P)',
+    layout = make_layout(settings, title='EoS Phase Diagram',
                          xaxis_title='Temperature [K]',
                          yaxis_title='Pressure [MPa]')
     fig.update_layout(**layout)
@@ -145,10 +207,18 @@ def _empty_figure(settings=None):
     return fig
 
 
+_ALL_KEYS = [
+    'LLCP', 'spinodal', 'hdl_spinodal', 'ldl_spinodal', 'binodal',
+    'tmd', 'widom', 'ice_ih_liquidus', 'ice_iii_liquidus',
+    'nucleation_ih', 'nucleation_iii', 'kauzmann_hdl', 'kauzmann_ldl',
+    'triple_point',
+]
+
+
 def _serialize_pd(pd_data):
     """Convert phase diagram data (with numpy arrays) to JSON-safe dicts."""
     result = {}
-    for key in ('LLCP', 'spinodal', 'binodal'):
+    for key in _ALL_KEYS:
         if key not in pd_data or pd_data[key] is None:
             result[key] = None
             continue
@@ -168,7 +238,7 @@ def _serialize_pd(pd_data):
 def _deserialize_pd(pd_data):
     """Convert stored JSON lists back to numpy arrays where needed."""
     result = {}
-    for key in ('LLCP', 'spinodal', 'binodal'):
+    for key in _ALL_KEYS:
         if key not in pd_data or pd_data[key] is None:
             result[key] = None
             continue

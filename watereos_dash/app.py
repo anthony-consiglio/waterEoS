@@ -26,6 +26,7 @@ from watereos_dash.layouts import (
     model_comparison_layout,
     point_calculator_layout,
     settings_layout,
+    h2o_phase_diagram_layout,
 )
 from watereos_dash.callbacks import register_all
 
@@ -54,7 +55,8 @@ tabs = dbc.Tabs(
     children=[
         dbc.Tab(label='Info', tab_id='tab-info'),
         dbc.Tab(label='Property Explorer', tab_id='tab-pe'),
-        dbc.Tab(label='Phase Diagram', tab_id='tab-pd'),
+        dbc.Tab(label='H2O Phase Diagram', tab_id='tab-h2o'),
+        dbc.Tab(label='EoS Phase Diagram', tab_id='tab-pd'),
         dbc.Tab(label='Model Comparison', tab_id='tab-mc'),
         dbc.Tab(label='Point Calculator', tab_id='tab-pc'),
         dbc.Tab(label='Settings', tab_id='tab-st'),
@@ -89,7 +91,7 @@ app.layout = html.Div(
                         'letterSpacing': '0.5px',
                     },
                 ),
-                html.Div(tabs, style={'flex': 1}),
+                html.Div(tabs, style={'flex': 1, 'minWidth': 0, 'overflow': 'visible'}),
             ],
         ),
         # Tab content — all rendered, toggled via CSS display
@@ -99,6 +101,7 @@ app.layout = html.Div(
         html.Div(id='tab-mc-content', children=model_comparison_layout(), style=_hidden),
         html.Div(id='tab-pc-content', children=point_calculator_layout(), style=_hidden),
         html.Div(id='tab-st-content', children=settings_layout(), style=_hidden),
+        html.Div(id='tab-h2o-content', children=h2o_phase_diagram_layout(), style=_hidden),
     ],
 )
 
@@ -110,7 +113,8 @@ app.layout = html.Div(
      dash.Output('tab-pd-content', 'style'),
      dash.Output('tab-mc-content', 'style'),
      dash.Output('tab-pc-content', 'style'),
-     dash.Output('tab-st-content', 'style')],
+     dash.Output('tab-st-content', 'style'),
+     dash.Output('tab-h2o-content', 'style')],
     dash.Input('main-tabs', 'active_tab'),
 )
 def switch_tab(tab):
@@ -119,8 +123,9 @@ def switch_tab(tab):
     idx = {
         'tab-info': 0, 'tab-pe': 1, 'tab-pd': 2,
         'tab-mc': 3, 'tab-pc': 4, 'tab-st': 5,
+        'tab-h2o': 6,
     }
-    styles = [hidden] * 6
+    styles = [hidden] * 7
     styles[idx.get(tab, 0)] = shown
     return styles
 

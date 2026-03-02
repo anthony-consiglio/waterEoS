@@ -33,3 +33,23 @@ htmlcov/
 
 # Data artifacts
 *.npz
+
+# Rust build artifacts
+Cargo.lock
+target/
+
+# Generated figures and plots
+figures/
+*.png
+*.jpeg
+*.html
+
+# Debug / scratch
+adam_error.txt
+plot_*.py
+
+# Reference PDFs
+references/
+
+# Local tool settings
+.claude/
