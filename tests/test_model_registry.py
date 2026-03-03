@@ -8,7 +8,7 @@ the real model implementations.
 
 import numpy as np
 import pytest
-from watereos_gui.utils.model_registry import (
+from watereos.model_registry import (
     MODEL_REGISTRY,
     MODEL_ORDER,
     PROPERTY_LABELS,

@@ -19,11 +19,12 @@ def _sf_entropy(T_arr, P_arr):
 
 
 def compute_kauzmann_temperature(P_MPa, compute_batch,
+                                 T_target=185.0,
                                  T_scan_lo=100.0, T_scan_hi=280.0, n_scan=300):
     """Compute Kauzmann temperature (S_liquid = S_ice_Ih) at given pressure(s).
 
     At each pressure, scans S_liquid(T) - S_ice(T) for zero-crossings and
-    picks the crossing nearest to 185 K. Refines with 30 iterations of
+    picks the crossing nearest to *T_target*. Refines with 30 iterations of
     bisection using both the liquid model and SeaFreeze ice Ih.
 
     Parameters
@@ -32,6 +33,9 @@ def compute_kauzmann_temperature(P_MPa, compute_batch,
         Pressure(s) in MPa.
     compute_batch : callable
         Model's compute_batch(T_arr, P_arr) -> dict with 'S' key.
+    T_target : float
+        Target temperature (K) for selecting among multiple crossings.
+        Use ~185 for HDL Kauzmann, ~155 for LDL Kauzmann.
     T_scan_lo, T_scan_hi : float
         Temperature scan range in K.
     n_scan : int
@@ -69,7 +73,7 @@ def compute_kauzmann_temperature(P_MPa, compute_batch,
             if np.isfinite(row[j]) and np.isfinite(row[j + 1]) and row[j] * row[j + 1] < 0:
                 xings.append(j)
         if xings:
-            best_j = min(xings, key=lambda j: abs(0.5 * (T_scan[j] + T_scan[j + 1]) - 185.0))
+            best_j = min(xings, key=lambda j: abs(0.5 * (T_scan[j] + T_scan[j + 1]) - T_target))
             T_lo_list.append(T_scan[best_j])
             T_hi_list.append(T_scan[best_j + 1])
             P_list.append(P_arr[ip])

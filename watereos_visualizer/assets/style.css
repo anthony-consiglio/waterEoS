@@ -1,0 +1,133 @@
+/* waterEoS-Visualizer — Minimal overrides for DMC dark theme */
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--mantine-color-dark-8);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--mantine-color-dark-4);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--mantine-color-blue-5);
+}
+
+/* === Plotly modebar === */
+.modebar {
+    background-color: transparent !important;
+}
+.modebar-btn path {
+    fill: var(--mantine-color-dark-2) !important;
+}
+.modebar-btn:hover path {
+    fill: var(--mantine-color-blue-5) !important;
+}
+.modebar-btn.active path {
+    fill: var(--mantine-color-blue-5) !important;
+}
+
+/* === DataTable (Plotly Dash native, not styled by DMC) === */
+.dash-spreadsheet-container .dash-spreadsheet-inner th {
+    background-color: var(--mantine-color-dark-7) !important;
+    color: var(--mantine-color-dark-0) !important;
+    border-color: var(--mantine-color-dark-4) !important;
+    font-weight: 600;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner td {
+    background-color: var(--mantine-color-dark-8) !important;
+    color: var(--mantine-color-dark-0) !important;
+    border-color: var(--mantine-color-dark-4) !important;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner tr:nth-child(even) td {
+    background-color: var(--mantine-color-dark-7) !important;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner td.focused {
+    background-color: var(--mantine-color-dark-5) !important;
+    outline: none !important;
+}
+
+/* === Info tab — Markdown content === */
+.info-markdown h2 {
+    color: var(--mantine-color-dark-0);
+    border-bottom: 1px solid var(--mantine-color-dark-4);
+    padding-bottom: 6px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+}
+.info-markdown h3 {
+    color: var(--mantine-color-dark-1);
+    margin-top: 20px;
+    margin-bottom: 8px;
+}
+.info-markdown a {
+    color: var(--mantine-color-blue-5);
+}
+.info-markdown a:hover {
+    color: var(--mantine-color-blue-3);
+}
+.info-markdown code {
+    background-color: var(--mantine-color-dark-6);
+    color: var(--mantine-color-indigo-3);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+.info-markdown pre {
+    background-color: var(--mantine-color-dark-8);
+    border: 1px solid var(--mantine-color-dark-4);
+    border-radius: 6px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+}
+.info-markdown pre code {
+    background-color: transparent;
+    padding: 0;
+    color: var(--mantine-color-indigo-3);
+    font-size: 13px;
+}
+.info-markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+.info-markdown th {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--mantine-color-dark-4);
+    color: var(--mantine-color-dark-0);
+    font-weight: 600;
+}
+.info-markdown td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--mantine-color-dark-6);
+    color: var(--mantine-color-dark-2);
+}
+.info-markdown tr:nth-child(even) {
+    background-color: var(--mantine-color-dark-7);
+}
+.info-markdown ul, .info-markdown ol {
+    padding-left: 24px;
+    color: var(--mantine-color-dark-2);
+}
+.info-markdown li {
+    margin-bottom: 4px;
+}
+.info-markdown p {
+    margin-bottom: 10px;
+}
+.info-markdown strong {
+    color: var(--mantine-color-dark-0);
+}
+.info-markdown em {
+    color: var(--mantine-color-dark-1);
+}
+
+/* === Loading spinner === */
+._dash-loading {
+    color: var(--mantine-color-blue-5) !important;
+}

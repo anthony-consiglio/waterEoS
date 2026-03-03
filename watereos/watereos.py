@@ -17,19 +17,9 @@ import warnings
 import numpy as np
 
 from watereos._common import _is_grid_input
+from watereos.model_registry import MODEL_REGISTRY
 
 _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020', 'grenke2025', 'singh2017']
-
-# Suggested validity ranges: (T_min, T_max, P_min, P_max)
-_VALID_RANGES = {
-    'water1':     (240, 500, 0.1, 2300),
-    'IAPWS95':    (240, 500, 0.1, 2300),
-    'holten2014': (200, 300, 0.0, 400),
-    'caupin2019': (200, 300, -140, 400),
-    'duska2020':  (200, 370, 0.1, 200),
-    'grenke2025': (200, 300, 0.1, 400),
-    'singh2017':  (200, 300, 0.0, 400),
-}
 
 # Case-insensitive lookup  ->  canonical name
 _CANONICAL = {name.lower(): name for name in _MODELS}
@@ -76,10 +66,10 @@ def _validate_PT(PT):
 
 def _check_bounds(PT, model):
     """Warn if any (T, P) values fall outside the model's suggested range."""
-    rng = _VALID_RANGES.get(model)
-    if rng is None:
+    info = MODEL_REGISTRY.get(model)
+    if info is None:
         return
-    T_min, T_max, P_min, P_max = rng
+    T_min, T_max, P_min, P_max = info.T_min, info.T_max, info.P_min, info.P_max
 
     try:
         if _is_grid_input(PT):

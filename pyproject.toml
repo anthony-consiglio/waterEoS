@@ -27,29 +27,26 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["jax>=0.4.30", "pytest"]
-gui = ["PyQt6>=6.5", "matplotlib>=3.7"]
 web = [
     "dash>=2.14",
-    "dash-bootstrap-components>=1.5",
+    "dash-mantine-components>=0.14",
     "plotly>=5.18",
     "gunicorn>=21.2",
 ]
 tv = ["iapws>=0.4"]
 rust = ["setuptools-rust>=1.9"]
 
-[project.scripts]
-watereos-gui = "watereos_gui.app:main"
-
 [project.urls]
 Homepage = "https://github.com/anthony-consiglio/waterEoS"
 Issues = "https://github.com/anthony-consiglio/waterEoS/issues"
 
 [tool.setuptools.packages.find]
-include = ["watereos*", "watereos_ad*", "watereos_gui*", "watereos_dash*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*"]
+include = ["watereos*", "watereos_ad*", "watereos_visualizer*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*"]
 exclude = ["tests*", "examples*"]
 
 [tool.setuptools.package-data]
-"watereos_dash" = ["assets/**/*"]
+"watereos_visualizer" = ["assets/**/*"]
+"watereos" = ["data/*.json"]
 
 [[tool.setuptools-rust.ext-modules]]
 target = "watereos_rs"
@@ -61,5 +58,5 @@ python-packages = [
     "watereos", "watereos_ad",
     "caupin_eos", "duska_eos", "holten_eos", "grenke_eos",
     "singh_viscosity",
-    "watereos_gui", "watereos_dash",
+    "watereos_visualizer",
 ]

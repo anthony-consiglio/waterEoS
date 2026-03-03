@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: watereos
+    name: watereos-visualizer
     runtime: python
     buildCommand: pip install -r requirements-web.txt
-    startCommand: gunicorn watereos_dash.app:server --bind 0.0.0.0:$PORT
+    startCommand: gunicorn watereos_visualizer.app:server --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
