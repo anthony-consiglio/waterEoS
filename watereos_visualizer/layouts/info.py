@@ -6,9 +6,7 @@ import dash_mantine_components as dmc
 _CONTENT = r"""
 ## About
 
-**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It unifies five equation-of-state models under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. This web app lets you interactively explore, compare, and compute thermodynamic properties across all models.
-
-The three two-state models include a compiled **Rust backend** (via PyO3) that is 2–5x faster than the pure Python fallback. Pre-built wheels for Linux, macOS, and Windows are available on [PyPI](https://pypi.org/project/waterEoS/). For installation, usage, and full documentation see the [GitHub repository](https://github.com/anthony-consiglio/waterEoS).
+**waterEoS** is a Python package for computing thermodynamic and transport properties of supercooled water. It unifies five equation-of-state models under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. This web app lets you interactively explore, compare, and compute thermodynamic properties across all models. For installation, usage, and full documentation see the [GitHub repository](https://github.com/anthony-consiglio/waterEoS).
 
 ---
 
