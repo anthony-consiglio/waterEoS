@@ -14,27 +14,51 @@ _CONTENT = r"""
 
 ### Property Explorer
 
-Plot any thermodynamic property as **isobars or isotherms** (curves mode), a **2D heatmap** with contour overlay, or a **rotatable 3D surface**. Select a model and property, set temperature/pressure ranges, then click **Update Plot**. Use the **Z/Color Axis** dropdown in surface modes to rearrange axes. Enable **Show phase boundaries** for two-state models to overlay the spinodal, binodal, and LLCP. Download curve data as CSV via the sidebar button.
+Plot any thermodynamic property as **isobars or isotherms** (curves mode), a **2D heatmap** with contour overlay, or a **rotatable 3D surface**. Select a model and property from the sidebar, set temperature and pressure ranges, then click **Update Plot**.
+
+In **Curves** mode, each curve corresponds to a fixed pressure (isobars) or temperature (isotherms). For two-state models, enable **Show phase boundaries** to overlay the LL spinodal, binodal, and LLCP on the plot. The example below shows specific volume isobars for Duska (2020) with phase boundaries — the liquid–liquid transition is visible as a sharp step at low temperatures.
+
+![Property Explorer — Curves mode](/assets/duska_volume_curves.png)
+
+Switch to **3D** mode for an interactive surface that you can rotate, zoom, and pan. The **Z / Color Axis** dropdown lets you choose which variable maps to the vertical axis vs. the color scale. Hover over the surface to read exact values. Below, the Caupin (2019) density surface shows the characteristic low-density region in the deeply supercooled regime.
+
+![Property Explorer — 3D surface mode](/assets/caupin_density_surface.png)
+
+Download the underlying curve data as a CSV file via the **Download CSV** button in the sidebar.
 
 ### H2O Phase Diagram
 
-View the **multi-phase water phase diagram** computed via isothermal convex-hull analysis using [SeaFreeze](https://github.com/Bjournaux/SeaFreeze). Shows stability fields and coexistence boundaries for liquid water, Ice Ih, Ice II, Ice III, Ice V, and Ice VI in T–V, T–P, or 3D P–T–V projections. Use the sidebar controls to adjust display limits.
+View the **multi-phase water phase diagram** computed via isothermal convex-hull analysis using [SeaFreeze](https://github.com/Bjournaux/SeaFreeze). Shows stability fields and coexistence boundaries for liquid water, Ice Ih, Ice II, Ice III, Ice V, and Ice VI. Choose between **T–V**, **T–P**, or **3D P–T–V** projections using the sidebar radio buttons, and adjust display limits to zoom into regions of interest. Hover over any phase region to see the phase identity and state variables.
+
+![H2O Phase Diagram — 3D P–T–V projection](/assets/ptv_phase_diagram.png)
 
 ### EoS Phase Diagram
 
-Compute and display the **liquid–liquid phase diagram** (T–P plane) for two-state models (Holten 2014, Caupin 2019, Duska 2020). Shows the LL binodal, HDL/LDL spinodals, LLCP, temperature of maximum density (TMD), Widom line, Kauzmann temperature, and ice Ih/III liquidus and nucleation curves. Toggle individual curves on/off without recomputing. Click any point on the diagram to send its (T, P) coordinates to the Point Calculator tab.
+Compute and display the **liquid–liquid phase diagram** (T–P plane) for two-state models (Holten 2014, Caupin 2019, Duska 2020). The diagram includes the LL binodal, HDL and LDL spinodals, LLCP, temperature of maximum density (TMD), Widom line (Cp max), Kauzmann temperature (where liquid entropy equals ice entropy), and ice Ih/III liquidus and nucleation curves. Use the checkboxes to toggle individual curves on or off without recomputing. Click any point on the diagram to send its (T, P) coordinates directly to the Point Calculator tab.
+
+![EoS Phase Diagram — Duska (2020)](/assets/duska_eos_phase_diagram.png)
 
 ### Model Comparison
 
-Compare **two or more models** side-by-side or overlaid on a single plot. Select models and a shared property, then choose Overlay (model-colored curves on one axes) or Side by Side (one subplot per model with a shared y-axis).
+Compare **two or more models** on the same property over a shared temperature and pressure range. Select models and a property from the sidebar, configure the axis ranges and number of curves, then choose **Overlay** (model-colored curves on a single axes) or **Side by Side** (one subplot per model with a shared y-axis). This is useful for identifying where models agree and where they diverge — especially in the deeply supercooled regime near the liquid–liquid critical point.
+
+![Model Comparison — Duska vs. Holten density overlay](/assets/duska_holten_model_comparison.png)
 
 ### Point Calculator
 
-Enter a temperature and pressure (or receive them from a Phase Diagram click) and select one or more models. Click **Calculate** to get a table of all thermodynamic properties at that state point, formatted to 6 significant figures.
+Enter a temperature and pressure (or receive them from a Phase Diagram click) and select one or more models. Click **Calculate** to get a table of all thermodynamic properties at that state point, formatted to 6 significant figures. The table displays one column per model, making it easy to compare exact values. Units reflect the current selection in the Settings tab.
+
+![Point Calculator — Duska & Holten at 273.15 K, 0.1 MPa](/assets/duska_holten_point_calculator.png)
 
 ### Settings
 
-Customize curve palette, surface colormap, phase boundary colors, line widths, font size, grid visibility, and plot background. Changes apply to all tabs in real time. Settings are saved in your browser and persist across sessions. Click **Reset to Defaults** to restore the original appearance.
+Customize the **appearance** of all plots: curve palette, surface colormap, phase boundary colors (binodal, spinodal, LLCP), line widths, font size, grid visibility, and background color. A live preview on the right updates as you adjust each control.
+
+The **Units** section lets you change display units for density, specific volume, energy, entropy/heat capacity, bulk modulus, and viscosity. Unit conversions are applied at display time across all tabs — the underlying computation always runs in native SI units.
+
+All settings are saved in your browser's local storage and persist across sessions. Click **Reset to Defaults** to restore the original configuration.
+
+![Settings — appearance and unit controls](/assets/app_settings.png)
 
 ---
 

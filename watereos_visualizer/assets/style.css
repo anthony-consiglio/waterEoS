@@ -120,6 +120,13 @@
 .info-markdown p {
     margin-bottom: 10px;
 }
+.info-markdown img {
+    max-width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--mantine-color-dark-4);
+    margin: 8px 0 16px 0;
+    display: block;
+}
 .info-markdown strong {
     color: var(--mantine-color-dark-0);
 }
