@@ -41,6 +41,7 @@ target/
 # Generated figures and plots
 figures/
 *.png
+!watereos_visualizer/assets/*.png
 *.jpeg
 *.html
 
