@@ -6,7 +6,9 @@ import dash_mantine_components as dmc
 _CONTENT = r"""
 ## About
 
-**waterEoS** provides Python implementations of three two-state equations of state (EOS), one empirical Tait–Tammann EOS, and a two-state transport properties model for supercooled water, unified under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. This web app lets you interactively explore, compare, and compute thermodynamic properties across all models.
+**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It unifies five equation-of-state models under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API. This web app lets you interactively explore, compare, and compute thermodynamic properties across all models.
+
+The three two-state models include a compiled **Rust backend** (via PyO3) that is 2–5x faster than the pure Python fallback. Pre-built wheels for Linux, macOS, and Windows are available on [PyPI](https://pypi.org/project/waterEoS/).
 
 ---
 
@@ -16,9 +18,13 @@ _CONTENT = r"""
 
 Plot any thermodynamic property as **isobars or isotherms** (curves mode), a **2D heatmap** with contour overlay, or a **rotatable 3D surface**. Select a model and property, set temperature/pressure ranges, then click **Update Plot**. Use the **Z/Color Axis** dropdown in surface modes to rearrange axes. Enable **Show phase boundaries** for two-state models to overlay the spinodal, binodal, and LLCP. Download curve data as CSV via the sidebar button.
 
-### Phase Diagram
+### H2O Phase Diagram
 
-Compute and display the **liquid–liquid phase diagram** (T–P plane) for two-state models (Duska 2020, Holten 2014, Caupin 2019). Toggle binodal, spinodal, and LLCP visibility without recomputing. Click any point on the diagram to send its (T, P) coordinates to the Point Calculator tab.
+View the **multi-phase water phase diagram** computed via isothermal convex-hull analysis using [SeaFreeze](https://github.com/Bjournaux/SeaFreeze). Shows stability fields and coexistence boundaries for liquid water, Ice Ih, Ice II, Ice III, Ice V, and Ice VI in T–V, T–P, or 3D P–T–V projections. Use the sidebar controls to adjust display limits.
+
+### EoS Phase Diagram
+
+Compute and display the **liquid–liquid phase diagram** (T–P plane) for two-state models (Holten 2014, Caupin 2019, Duska 2020). Shows the LL binodal, HDL/LDL spinodals, LLCP, temperature of maximum density (TMD), Widom line, Kauzmann temperature, and ice Ih/III liquidus and nucleation curves. Toggle individual curves on/off without recomputing. Click any point on the diagram to send its (T, P) coordinates to the Point Calculator tab.
 
 ### Model Comparison
 
@@ -56,6 +62,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'caupin2019'` | ~200–300 K, -140–400 MPa | Unbounded (any T, P) |
 | `'duska2020'` | ~200–370 K, 0–100 MPa (extrap. to 200 MPa) | Unbounded (any T, P) |
 | `'grenke2025'` | 200–300 K, 0.1–400 MPa | Unbounded (any T, P) |
+| `'singh2017'` | 200–300 K, 0–400 MPa (matches Holten backbone) | Unbounded (any T, P) |
 | `'water1'` | 240–501 K, 0–2300 MPa | Enforced by SeaFreeze |
 | `'IAPWS95'` | 240–501 K, 0–2300 MPa | Enforced by SeaFreeze |
 
@@ -64,7 +71,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Duska (2020) was fitted to data at positive pressures only; negative-pressure extrapolation is unvalidated.
 - Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
 - Grenke (2025) is a direct empirical Tait-Tammann correlation, not a two-state model. It has no `x`, `_A`, or `_B` outputs.
-- Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
+- Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`.
 - Outside the paper-stated ranges, models may return unphysical values (e.g., negative compressibility or heat capacity) without warning.
 
 ---
