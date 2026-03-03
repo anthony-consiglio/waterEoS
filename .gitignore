@@ -42,6 +42,7 @@ target/
 figures/
 *.png
 !watereos_visualizer/assets/*.png
+!docs/*.png
 *.jpeg
 *.html
 

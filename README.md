@@ -31,6 +31,27 @@ All three return 43 thermodynamic properties: 15 mixture properties, 14 per stat
 
 The three two-state models and the Grenke model include a compiled **Rust backend** (via PyO3) that is 2-5x faster than the pure Python fallback. Pre-built wheels for Linux, macOS, and Windows are available on PyPI; the Rust backend is selected automatically when present.
 
+## Web App
+
+Try waterEoS interactively at **[watereos-visualizer.up.railway.app](https://watereos-visualizer.up.railway.app)**
+
+The web app includes a Property Explorer, EoS phase diagram viewer, H2O multi-phase diagram, model comparison tool, and point calculator.
+
+<p align="center">
+  <img src="docs/caupin_density_surface.png" alt="Property Explorer — 3D Density Surface" width="700"><br>
+  <em>3D density surface for Caupin (2019) with phase boundaries and interactive hover.</em>
+</p>
+
+<p align="center">
+  <img src="docs/duska_volume_curves.png" alt="Property Explorer — Volume Isobars" width="700"><br>
+  <em>Specific volume isobars with spinodal, binodal, and LLCP for Duska (2020).</em>
+</p>
+
+<p align="center">
+  <img src="docs/ptv_phase_diagram.png" alt="H2O P-T-V Phase Diagram" width="700"><br>
+  <em>3D P-T-V phase diagram of H₂O showing stability fields for liquid water, Ice Ih, II, III, V, and VI.</em>
+</p>
+
 ## Installation
 
 ```bash
