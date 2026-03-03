@@ -7,6 +7,7 @@ from dash import Input, Output, State, no_update
 from watereos_visualizer.style import (
     PALETTE_OPTIONS, CMAP_OPTIONS, DEFAULTS, BG_OPTIONS, make_layout,
 )
+from watereos_visualizer.units import UNIT_DEFAULTS
 
 
 def register(app):
@@ -22,11 +23,19 @@ def register(app):
          Input('st-font-size', 'value'),
          Input('st-grid', 'checked'),
          Input('st-background', 'value'),
+         Input('st-unit-density', 'value'),
+         Input('st-unit-volume', 'value'),
+         Input('st-unit-energy', 'value'),
+         Input('st-unit-entropy', 'value'),
+         Input('st-unit-bulk-modulus', 'value'),
+         Input('st-unit-viscosity', 'value'),
          Input('st-reset', 'n_clicks')],
         prevent_initial_call=True,
     )
     def update_settings(palette, cmap, bin_color, spin_color, llcp_color,
-                        line_w, phase_lw, font_sz, grid_checked, bg, reset_clicks):
+                        line_w, phase_lw, font_sz, grid_checked, bg,
+                        u_density, u_volume, u_energy, u_entropy,
+                        u_bulk, u_viscosity, reset_clicks):
         from dash import callback_context
         ctx = callback_context
         if ctx.triggered and ctx.triggered[0]['prop_id'] == 'st-reset.n_clicks':
@@ -43,6 +52,12 @@ def register(app):
             'font_size': int(font_sz) if font_sz is not None else DEFAULTS['font_size'],
             'grid_enabled': bool(grid_checked),
             'bg_color': bg or DEFAULTS['bg_color'],
+            'unit_density': u_density or DEFAULTS['unit_density'],
+            'unit_volume': u_volume or DEFAULTS['unit_volume'],
+            'unit_energy': u_energy or DEFAULTS['unit_energy'],
+            'unit_entropy': u_entropy or DEFAULTS['unit_entropy'],
+            'unit_bulk_modulus': u_bulk or DEFAULTS['unit_bulk_modulus'],
+            'unit_viscosity': u_viscosity or DEFAULTS['unit_viscosity'],
         }
 
     @app.callback(
@@ -55,7 +70,13 @@ def register(app):
          Output('st-phase-line-width', 'value'),
          Output('st-font-size', 'value'),
          Output('st-grid', 'checked'),
-         Output('st-background', 'value')],
+         Output('st-background', 'value'),
+         Output('st-unit-density', 'value'),
+         Output('st-unit-volume', 'value'),
+         Output('st-unit-energy', 'value'),
+         Output('st-unit-entropy', 'value'),
+         Output('st-unit-bulk-modulus', 'value'),
+         Output('st-unit-viscosity', 'value')],
         Input('st-reset', 'n_clicks'),
         prevent_initial_call=True,
     )
@@ -71,6 +92,12 @@ def register(app):
             DEFAULTS['font_size'],
             DEFAULTS['grid_enabled'],
             DEFAULTS['bg_color'],
+            DEFAULTS['unit_density'],
+            DEFAULTS['unit_volume'],
+            DEFAULTS['unit_energy'],
+            DEFAULTS['unit_entropy'],
+            DEFAULTS['unit_bulk_modulus'],
+            DEFAULTS['unit_viscosity'],
         )
 
     @app.callback(

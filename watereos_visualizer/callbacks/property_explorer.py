@@ -14,6 +14,7 @@ from watereos.computation import (
 from watereos_visualizer.style import (
     get_palette, get_phase_traces, make_layout, make_layout_3d, DEFAULTS,
 )
+from watereos_visualizer.units import get_factor, display_label, convert_array
 
 
 def _error_figure(message, settings=None):
@@ -160,13 +161,16 @@ def register(app):
          State('pe-pmax', 'value'),
          State('pe-ncurves', 'value'),
          State('pe-npoints', 'value'),
-         State('pe-curve-type', 'value')],
+         State('pe-curve-type', 'value'),
+         State('settings-store', 'data')],
         prevent_initial_call=True,
     )
     def download_csv(n_clicks, model_key, prop_key, tmin, tmax, pmin, pmax,
-                     n_curves, n_points, curve_type):
+                     n_curves, n_points, curve_type, settings):
         if not model_key or not prop_key:
             return no_update
+
+        settings = settings or DEFAULTS
 
         T_range = (float(tmin), float(tmax))
         P_range = (float(pmin), float(pmax))
@@ -175,13 +179,17 @@ def register(app):
             model_key, prop_key, T_range, P_range,
             int(n_curves or 5), int(n_points or 200), isobar_mode)
 
-        lines = [f"# {data['title']}"]
+        factor = get_factor(prop_key, settings)
+        y_label = display_label(prop_key, settings)
+        title = f"{MODEL_REGISTRY[model_key].display_name} \u2014 {y_label}"
+
+        lines = [f"# {title}"]
         for i, (x, y, label) in enumerate(
                 zip(data['x_values'], data['y_values'], data['curve_labels'])):
             lines.append(f"\n# Curve {i+1}: {label}")
-            lines.append(f"{data['x_label']},{data['y_label']}")
+            lines.append(f"{data['x_label']},{y_label}")
             for xv, yv in zip(x, y):
-                lines.append(f"{xv},{yv}")
+                lines.append(f"{xv},{yv * factor}")
 
         return dcc.send_string('\n'.join(lines), filename=f'{model_key}_{prop_key}.csv')
 
@@ -204,8 +212,11 @@ def _store_curves(model_key, prop_key, T_range, P_range,
             'label': label,
         })
 
+    info = MODEL_REGISTRY[model_key]
     stored = {
         'mode': 'curves',
+        'prop_key': prop_key,
+        'model_display_name': info.display_name,
         'title': data['title'],
         'x_label': data['x_label'],
         'y_label': data['y_label'],
@@ -227,6 +238,7 @@ def _store_surface_2d(model_key, prop_key, T_range, P_range,
 
     stored = {
         'mode': 'surface2d',
+        'prop_key': prop_key,
         'model_display_name': info.display_name,
         'prop_label': get_display_label(prop_key),
         'z_choice': z_choice,
@@ -249,6 +261,7 @@ def _store_surface_3d(model_key, prop_key, T_range, P_range,
 
     stored = {
         'mode': 'surface3d',
+        'prop_key': prop_key,
         'model_display_name': info.display_name,
         'prop_label': get_display_label(prop_key),
         'z_choice': z_choice,
@@ -272,20 +285,31 @@ def _render_curves(pe_data, settings):
     palette = get_palette(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])
 
+    prop_key = pe_data.get('prop_key', '')
+    factor = get_factor(prop_key, settings)
+    y_label = display_label(prop_key, settings) if prop_key else pe_data['y_label']
+    model_name = pe_data.get('model_display_name', '')
+    title = f'{model_name} \u2014 {y_label}' if model_name else pe_data['title']
+
     fig = go.Figure()
     for i, curve in enumerate(pe_data['curves']):
+        y = convert_array(prop_key, curve['y'], settings) if factor != 1.0 else curve['y']
         fig.add_trace(go.Scatter(
-            x=curve['x'], y=curve['y'],
+            x=curve['x'], y=y,
             mode='lines', name=curve['label'],
             line=dict(color=palette[i % len(palette)], width=lw),
             hovertemplate=f"{curve['label']}<br>%{{x:.2f}}<br>%{{y:.6g}}<extra></extra>",
         ))
 
-    _add_phase_traces_2d(fig, pe_data.get('phase'), settings)
+    # Phase traces are in native property units — convert them too
+    phase = pe_data.get('phase')
+    if phase and factor != 1.0:
+        phase = [dict(pt, y=convert_array(prop_key, pt['y'], settings)) for pt in phase]
+    _add_phase_traces_2d(fig, phase, settings)
 
-    layout = make_layout(settings, title=pe_data['title'],
+    layout = make_layout(settings, title=title,
                          xaxis_title=pe_data['x_label'],
-                         yaxis_title=pe_data['y_label'])
+                         yaxis_title=y_label)
     fig.update_layout(**layout)
     return fig
 
@@ -293,10 +317,17 @@ def _render_curves(pe_data, settings):
 def _render_surface_2d(pe_data, settings):
     cmap = settings.get('surface_cmap', DEFAULTS['surface_cmap'])
     z_choice = pe_data['z_choice']
-    prop_label = pe_data['prop_label']
     T_1d = pe_data['T_1d']
     P_1d = pe_data['P_1d']
     Z = pe_data['Z']
+
+    prop_key = pe_data.get('prop_key', '')
+    factor = get_factor(prop_key, settings)
+    prop_label = display_label(prop_key, settings) if prop_key else pe_data['prop_label']
+
+    # Convert Z values if needed
+    if factor != 1.0:
+        Z = [[v * factor for v in row] for row in Z]
 
     fig = go.Figure()
 
@@ -335,7 +366,7 @@ def _render_surface_2d(pe_data, settings):
         for trace in get_phase_traces(pe_data['phase_pd'], settings):
             fig.add_trace(trace)
 
-    title = f"{pe_data['model_display_name']} — {prop_label}"
+    title = f"{pe_data['model_display_name']} \u2014 {prop_label}"
     layout = make_layout(settings, title=title, xaxis_title=xlabel, yaxis_title=ylabel)
     if has_phase:
         layout['legend'] = dict(
@@ -351,10 +382,17 @@ def _render_surface_2d(pe_data, settings):
 def _render_surface_3d(pe_data, settings):
     cmap = settings.get('surface_cmap', DEFAULTS['surface_cmap'])
     z_choice = pe_data['z_choice']
-    prop_label = pe_data['prop_label']
     T_grid = pe_data['T_grid']
     P_grid = pe_data['P_grid']
     Z = pe_data['Z']
+
+    prop_key = pe_data.get('prop_key', '')
+    factor = get_factor(prop_key, settings)
+    prop_label = display_label(prop_key, settings) if prop_key else pe_data['prop_label']
+
+    # Convert Z values if needed
+    if factor != 1.0:
+        Z = [[v * factor for v in row] for row in Z]
 
     if z_choice == 'property':
         X, Y, ZZ = T_grid, P_grid, Z
@@ -381,9 +419,14 @@ def _render_surface_3d(pe_data, settings):
         ),
     ))
 
-    _add_phase_traces_3d(fig, pe_data.get('phase'), z_choice, settings)
+    # Phase traces: convert the property dimension
+    phase = pe_data.get('phase')
+    if phase and factor != 1.0:
+        phase = [dict(pt, prop=convert_array(prop_key, pt['prop'], settings))
+                 for pt in phase]
+    _add_phase_traces_3d(fig, phase, z_choice, settings)
 
-    title = f"{pe_data['model_display_name']} — {prop_label}"
+    title = f"{pe_data['model_display_name']} \u2014 {prop_label}"
     layout = make_layout_3d(settings, title=title,
                             xaxis_title=xlabel, yaxis_title=ylabel, zaxis_title=zlabel)
     if has_phase:

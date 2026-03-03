@@ -4,9 +4,35 @@ from dash import dcc, html
 import dash_mantine_components as dmc
 
 from watereos_visualizer.style import PALETTE_OPTIONS, CMAP_OPTIONS, DEFAULTS, BG_OPTIONS
+from watereos_visualizer.units import UNIT_OPTIONS, UNIT_DEFAULTS, CATEGORY_LABELS
 
 _palette_options = [{'label': k, 'value': k} for k in PALETTE_OPTIONS]
 _cmap_options = [{'label': c, 'value': c} for c in CMAP_OPTIONS]
+
+# Ordered list of unit setting keys for consistent UI
+_UNIT_KEYS = [
+    'unit_density', 'unit_volume', 'unit_energy',
+    'unit_entropy', 'unit_bulk_modulus', 'unit_viscosity',
+]
+
+
+def _unit_controls():
+    """Build the list of unit Select dropdowns."""
+    controls = []
+    for key in _UNIT_KEYS:
+        controls.append(
+            dmc.Text(CATEGORY_LABELS[key], size="xs", fw=600, c="dimmed",
+                     tt="uppercase"),
+        )
+        controls.append(
+            dmc.Select(
+                id=f'st-{key.replace("_", "-")}',
+                data=UNIT_OPTIONS[key],
+                value=DEFAULTS.get(key, UNIT_DEFAULTS[key]),
+                allowDeselect=False,
+            ),
+        )
+    return controls
 
 
 def layout():
@@ -98,6 +124,11 @@ def layout():
                 value=DEFAULTS['bg_color'],
             ),
 
+            dmc.Divider(my="sm"),
+            dmc.Text('Units', size="lg", fw=600),
+            *_unit_controls(),
+
+            dmc.Divider(my="sm"),
             dmc.Button('Reset to Defaults', id='st-reset', variant="outline",
                        fullWidth=True, n_clicks=0),
         ]),

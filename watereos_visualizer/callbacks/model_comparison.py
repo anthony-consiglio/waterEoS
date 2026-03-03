@@ -12,6 +12,7 @@ from watereos.computation import compute_multi_model_curves
 from watereos_visualizer.style import (
     get_palette, get_model_colors, make_layout, DEFAULTS,
 )
+from watereos_visualizer.units import get_factor, display_label, convert_array
 
 
 def register(app):
@@ -71,16 +72,17 @@ def register(app):
 def _build_overlay(results, model_keys, prop_key, settings):
     model_colors = get_model_colors(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])
+    factor = get_factor(prop_key, settings)
 
     fig = go.Figure()
-    x_label = y_label = ''
+    x_label = ''
+    y_label = display_label(prop_key, settings)
 
     for mk in model_keys:
         data = results.get(mk)
         if not data:
             continue
         x_label = data['x_label']
-        y_label = data['y_label']
         color = model_colors.get(mk, '#888888')
         name = MODEL_REGISTRY[mk].display_name
         n = len(data['x_values'])
@@ -88,20 +90,21 @@ def _build_overlay(results, model_keys, prop_key, settings):
         for i, (x, y, label) in enumerate(
                 zip(data['x_values'], data['y_values'], data['curve_labels'])):
             mask = np.isfinite(y)
+            y_disp = y[mask] * factor
             alpha = 0.4 + 0.6 * (i / max(n - 1, 1))
             fig.add_trace(go.Scatter(
-                x=x[mask], y=y[mask],
+                x=x[mask], y=y_disp,
                 mode='lines',
-                name=f'{name} — {label}',
+                name=f'{name} \u2014 {label}',
                 legendgroup=mk,
                 showlegend=(i == 0),
                 line=dict(color=color, width=lw),
                 opacity=alpha,
-                hovertemplate=f'{name} — {label}<br>%{{x:.2f}}<br>%{{y:.6g}}<extra></extra>',
+                hovertemplate=f'{name} \u2014 {label}<br>%{{x:.2f}}<br>%{{y:.6g}}<extra></extra>',
             ))
 
-    prop_label = get_display_label(prop_key)
-    layout = make_layout(settings, title=f'Model Comparison — {prop_label}',
+    prop_label = display_label(prop_key, settings)
+    layout = make_layout(settings, title=f'Model Comparison \u2014 {prop_label}',
                          xaxis_title=x_label, yaxis_title=y_label)
     fig.update_layout(**layout)
     return fig
@@ -111,24 +114,26 @@ def _build_sidebyside(results, model_keys, prop_key, settings):
     n_models = len(model_keys)
     palette = get_palette(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])
+    factor = get_factor(prop_key, settings)
 
     titles = [MODEL_REGISTRY[mk].display_name for mk in model_keys]
     fig = make_subplots(rows=1, cols=n_models, subplot_titles=titles,
                         shared_yaxes=True)
 
-    x_label = y_label = ''
+    x_label = ''
+    y_label = display_label(prop_key, settings)
     for col, mk in enumerate(model_keys, 1):
         data = results.get(mk)
         if not data:
             continue
         x_label = data['x_label']
-        y_label = data['y_label']
 
         for i, (x, y, label) in enumerate(
                 zip(data['x_values'], data['y_values'], data['curve_labels'])):
             mask = np.isfinite(y)
+            y_disp = y[mask] * factor
             fig.add_trace(go.Scatter(
-                x=x[mask], y=y[mask],
+                x=x[mask], y=y_disp,
                 mode='lines', name=label,
                 legendgroup=f'{mk}_{label}',
                 showlegend=(col == 1),
@@ -136,8 +141,8 @@ def _build_sidebyside(results, model_keys, prop_key, settings):
                 hovertemplate=f'{label}<br>%{{x:.2f}}<br>%{{y:.6g}}<extra></extra>',
             ), row=1, col=col)
 
-    prop_label = get_display_label(prop_key)
-    base = make_layout(settings, title=f'Model Comparison — {prop_label}')
+    prop_label = display_label(prop_key, settings)
+    base = make_layout(settings, title=f'Model Comparison \u2014 {prop_label}')
     fig.update_layout(**base)
 
     for col in range(1, n_models + 1):

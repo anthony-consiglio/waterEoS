@@ -6,6 +6,8 @@ from watereos.model_registry import (
     MODEL_REGISTRY, PROPERTY_LABELS, PROPERTY_UNITS,
 )
 from watereos.computation import compute_point_properties
+from watereos_visualizer.units import get_factor, get_unit_string
+from watereos_visualizer.style import DEFAULTS
 
 
 def register(app):
@@ -31,13 +33,15 @@ def register(app):
         Input('pc-calculate', 'n_clicks'),
         [State('pc-temperature', 'value'),
          State('pc-pressure', 'value'),
-         State('pc-models', 'value')],
+         State('pc-models', 'value'),
+         State('settings-store', 'data')],
         prevent_initial_call=True,
     )
-    def calculate(n_clicks, T, P, model_keys):
+    def calculate(n_clicks, T, P, model_keys, settings):
         if not model_keys or T is None or P is None:
             return no_update, no_update, 'Provide T, P, and at least one model.'
 
+        settings = settings or DEFAULTS
         T_K = float(T)
         P_MPa = float(P)
 
@@ -66,14 +70,15 @@ def register(app):
 
         rows = []
         for prop in all_props:
+            factor = get_factor(prop, settings)
             row = {
                 'property': PROPERTY_LABELS.get(prop, prop),
-                'unit': PROPERTY_UNITS.get(prop, ''),
+                'unit': get_unit_string(prop, settings),
             }
             for mk in model_keys:
                 val = results.get(mk, {}).get(prop)
                 if val is not None:
-                    row[mk] = f'{val:.6g}'
+                    row[mk] = f'{val * factor:.6g}'
                 else:
                     row[mk] = '\u2014'
             rows.append(row)

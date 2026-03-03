@@ -86,6 +86,13 @@ DEFAULTS = {
     'font_size': 12,
     'grid_enabled': True,
     'bg_color': '#1a1b1e',
+    # Unit preferences (native SI defaults)
+    'unit_density': 'kg/m\u00b3',
+    'unit_volume': 'm\u00b3/kg',
+    'unit_energy': 'J/kg',
+    'unit_entropy': 'J/(kg\u00b7K)',
+    'unit_bulk_modulus': 'MPa',
+    'unit_viscosity': 'Pa\u00b7s',
 }
 
 
