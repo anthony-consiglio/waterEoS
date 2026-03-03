@@ -252,6 +252,9 @@ def sample_phase_at_T(phase_name, T, config=None):
 
     with np.errstate(divide='ignore', invalid='ignore'):
         V = 1.0 / rho
+        # Helmholtz free energy: A = G - PV.  SeaFreeze returns Gibbs
+        # energy G [J/kg] and density rho [kg/m³].  V = 1/rho [m³/kg].
+        # P_arr is in MPa, so multiply by 1e6 to get Pa = J/m³.
         A = G - P_arr * 1e6 / rho
 
     valid = np.isfinite(V) & np.isfinite(A) & (rho > 0)
@@ -308,6 +311,7 @@ def _batch_evaluate_phases(phase_list, temperatures):
 
         with np.errstate(divide='ignore', invalid='ignore'):
             V = 1.0 / rho
+            # Helmholtz A = G - PV = G - P/rho  (P in Pa = MPa * 1e6)
             A = G - P_arr[:, None] * 1e6 / rho
 
         invalid = ~np.isfinite(V) | ~np.isfinite(A) | (rho <= 0)
@@ -333,21 +337,33 @@ def _batch_evaluate_phases(phase_list, temperatures):
 # Lower convex hull
 # ---------------------------------------------------------------------------
 def _trace_lower_hull(V_all, A_all, hull):
-    """Return ordered vertex indices along the lower hull, left to right."""
+    """Return ordered vertex indices along the lower hull, left to right.
+
+    The convex hull in (V, A) space has an upper envelope (high A) and a
+    lower envelope (low A = thermodynamically stable states).  Each hull
+    facet (edge in 2D) has an outward-pointing normal stored in
+    ``hull.equations``.  The A-component of the normal (index 1) is
+    negative for lower-hull edges (normal points downward).
+
+    We build an adjacency graph of lower-hull vertices and walk it from
+    the smallest-V vertex to the largest, yielding a left-to-right path.
+    """
     adj = defaultdict(set)
     for simplex, eq in zip(hull.simplices, hull.equations):
-        if eq[1] < 0:  # outward normal has negative A-component -> lower hull
-            i, j = simplex
+        # eq = [n_V, n_A, offset]; n_A < 0 means outward normal points down
+        if eq[1] < 0:
+            i, j = simplex  # 2D hull edges have exactly 2 vertices
             adj[i].add(j)
             adj[j].add(i)
 
     if not adj:
         return []
 
+    # Start at the leftmost (smallest V) vertex on the lower hull
     start = min(adj.keys(), key=lambda i: V_all[i])
 
     path = [start]
-    prev = None
+    prev = None          # previous vertex, used to prevent backtracking
     current = start
     while True:
         neighbors = adj[current] - ({prev} if prev is not None else set())
@@ -391,7 +407,8 @@ def _compute_hull_from_parts(V_parts, A_parts, P_parts, label_parts):
     if len(V_all) < 3:
         return empty
 
-    # Scale for numerical stability
+    # Normalize V and A to [0, 1] for numerical stability of ConvexHull
+    # (raw V spans ~1e-4 to ~2e-3 m³/kg, raw A spans ~-3e6 to ~-1e5 J/kg)
     V_lo, V_hi = V_all.min(), V_all.max()
     A_lo, A_hi = A_all.min(), A_all.max()
     V_range = V_hi - V_lo if V_hi > V_lo else 1.0
@@ -441,17 +458,20 @@ def _compute_hull_from_parts(V_parts, A_parts, P_parts, label_parts):
             'P_max': float(Ps.max()),
         })
 
-    # Two-phase coexistence
+    # Two-phase coexistence: between consecutive phase groups on the lower
+    # hull, the common tangent line connects the endpoints of each group.
+    # Its slope equals -P (thermodynamic identity: P = -(dA/dV)_T).
     two_phase = []
     for g in range(len(groups) - 1):
         _, idx_L = groups[g]
         _, idx_R = groups[g + 1]
-        iL = idx_L[-1]
-        iR = idx_R[0]
+        iL = idx_L[-1]   # rightmost point of left phase
+        iR = idx_R[0]    # leftmost point of right phase
         V_L, A_L = hp_V[iL], hp_A[iL]
         V_R, A_R = hp_V[iR], hp_A[iR]
         dV = V_R - V_L
         if abs(dV) > 0:
+            # P_coex = -(A_R - A_L)/(V_R - V_L) in Pa, then /1e6 → MPa
             P_coex = -(A_R - A_L) / dV / 1e6
         else:
             P_coex = float(hp_P[iL])
@@ -508,7 +528,17 @@ def compute_hull_at_T(T, phase_list=None):
 # Three-phase invariant detection
 # ---------------------------------------------------------------------------
 def _detect_invariants(temperatures, slices):
-    """Find temperatures where the topology of stable phases changes."""
+    """Find three-phase invariant points from topology changes.
+
+    A three-phase invariant is a temperature where three phases coexist in
+    equilibrium (e.g. the Ih/III/Liquid triple point at ~251.2 K).  We detect
+    these by monitoring the *ordered* list of stable phases along the lower
+    hull: when a phase appears or disappears between consecutive temperatures,
+    it and its two neighbours form the invariant trio.
+
+    Nearby duplicate detections (from the same physical invariant being
+    detected at slightly different T steps) are merged.
+    """
     invariants = []
     prev_ordered = None
     prev_T = None

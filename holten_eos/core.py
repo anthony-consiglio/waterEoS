@@ -113,16 +113,20 @@ def _findxe(L, omega):
     if flip:
         L = -L
 
-    # Smart bracket selection (from MATLAB)
+    # Smart bracket selection from the MATLAB reference (HoltenJPCRD2014.m).
+    # The brackets are chosen from empirical isolines of x_e(L, omega) to
+    # guarantee the root lies within [x0, x1] and minimise bisection steps.
+    # After the flip, x_e is always small (< 0.5), so narrow brackets work.
     if omega < 1.1111111 * (2.944439 - L):
-        # xe = 0.05 isoline
+        # Region where x_e ~ 0.05
         x0 = 0.049
         x1 = 0.5
     elif omega < 1.0204081 * (4.595119 - L):
-        # xe = 0.01 isoline
+        # Region where x_e ~ 0.01
         x0 = 0.0099
         x1 = 0.051
     else:
+        # Very small x_e: use exponential asymptotic estimates
         x0 = 0.99 * math.exp(-1.0204081 * L - omega)
         x1 = 1.01 * 1.087 * math.exp(-L - omega)
         if x1 > 0.0101:
@@ -213,7 +217,9 @@ def _physical_props_holten(tau, t, p_red, x,
     """
     omega = 2.0 + P.omega0 * p_red
 
-    # Order parameter and susceptibility
+    # Order parameter f = 2x - 1 maps x ∈ [0,1] to f ∈ [-1,1].
+    # chi is the "magnetic-like" susceptibility dx/dL = (1-f²)·chi/4.
+    # It diverges at the spinodal (mechanical instability).
     f = 2.0 * x - 1.0
     f2 = f * f
     if abs(1.0 - f2) > 1e-30:
@@ -221,7 +227,7 @@ def _physical_props_holten(tau, t, p_red, x,
     else:
         chi = 0.0
 
-    # Dimensionless properties (MATLAB lines 109–117)
+    # Dimensionless mixing Gibbs energy g0 = ideal + excess (MATLAB lines 109–117)
     EPS = 1e-300
     if x > EPS and x < 1.0 - EPS:
         g0 = x * L + x * math.log(x) + (1.0 - x) * math.log(1.0 - x) + omega * x * (1.0 - x)
@@ -230,15 +236,17 @@ def _physical_props_holten(tau, t, p_red, x,
     else:
         g0 = L + omega * 0.0  # x=1 limit
 
-    s = -0.5 * (f + 1.0) * Lt * tau - g0 - Bt_val
-    v = 0.5 * tau * (P.omega0 / 2.0 * (1.0 - f2) + Lp * (f + 1.0)) + Bp_val
+    # Dimensionless entropy, volume, compressibility, expansivity, heat capacity
+    # (all in units of R, rho0, Tc — Eqs. 4–8 of Holten 2014)
+    s = -0.5 * (f + 1.0) * Lt * tau - g0 - Bt_val              # -dG/dT
+    v = 0.5 * tau * (P.omega0 / 2.0 * (1.0 - f2) + Lp * (f + 1.0)) + Bp_val  # dG/dP
     kap = (1.0 / v) * (tau / 2.0 * (chi * (Lp - P.omega0 * f)**2
-                                     - (f + 1.0) * Lpp) - Bpp_val)
+                                     - (f + 1.0) * Lpp) - Bpp_val)  # -(1/V)d²G/dP²
     alp = (1.0 / v) * (Ltp / 2.0 * tau * (f + 1.0)
                         + (P.omega0 / 2.0 * (1.0 - f2) + Lp * (f + 1.0)) / 2.0
-                        - tau * Lt / 2.0 * chi * (Lp - P.omega0 * f) + Btp_val)
+                        - tau * Lt / 2.0 * chi * (Lp - P.omega0 * f) + Btp_val)  # (1/V)d²G/dPdT
     cp = tau * (-Lt * (f + 1.0) + tau * (Lt**2 * chi - Ltt * (f + 1.0)) / 2.0
-                - Btt_val)
+                - Btt_val)  # -T·d²G/dT²
 
     # SI units (MATLAB lines 119–127)
     S_val = P.R * s                              # J/(kg·K)

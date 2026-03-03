@@ -24,6 +24,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def update_props(model_keys, current_prop):
+        """Refresh the property dropdown to show only properties common to all selected models."""
         if not model_keys:
             return [], None
         common = get_common_properties(model_keys)
@@ -49,6 +50,7 @@ def register(app):
     )
     def update_plot(n_clicks, model_keys, prop_key, tmin, tmax, pmin, pmax,
                     n_curves, n_points, curve_type, layout_mode, settings):
+        """Compute curves for all selected models and build the comparison figure."""
         if not model_keys or len(model_keys) < 2 or not prop_key:
             return no_update
 
@@ -70,6 +72,7 @@ def register(app):
 
 
 def _build_overlay(results, model_keys, prop_key, settings):
+    """Build a single-axes figure with all models overlaid, colored by model."""
     model_colors = get_model_colors(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])
     factor = get_factor(prop_key, settings)
@@ -111,6 +114,7 @@ def _build_overlay(results, model_keys, prop_key, settings):
 
 
 def _build_sidebyside(results, model_keys, prop_key, settings):
+    """Build a multi-subplot figure with one panel per model, sharing the y-axis."""
     n_models = len(model_keys)
     palette = get_palette(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])

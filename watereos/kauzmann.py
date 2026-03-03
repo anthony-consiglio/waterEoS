@@ -1,8 +1,15 @@
 """
 Kauzmann temperature solver.
 
-Finds T where S_liquid(T, P) = S_ice_Ih(T, P) using SeaFreeze for ice Ih.
-Uses vectorized scan + bisection.
+The Kauzmann temperature is where the entropy of the metastable liquid
+equals that of ice Ih: S_liquid(T, P) = S_ice_Ih(T, P).  Below this
+temperature the liquid would have less entropy than the crystal, which
+is considered a thermodynamic lower bound on the metastable liquid.
+
+Algorithm: evaluate dS = S_liquid - S_ice on a (T, P) meshgrid, detect
+sign changes in dS along the T axis for each pressure, then refine with
+vectorized bisection.  SeaFreeze provides ice Ih entropy; the liquid
+model's compute_batch provides liquid entropy.
 """
 
 import numpy as np
@@ -10,7 +17,12 @@ import seafreeze.seafreeze as sf
 
 
 def _sf_entropy(T_arr, P_arr):
-    """Compute ice Ih entropy via SeaFreeze scatter mode."""
+    """Compute ice Ih entropy via SeaFreeze scatter mode.
+
+    SeaFreeze scatter mode uses an object array of (P, T) tuples, one per
+    point, rather than the grid-mode [P_1d, T_1d] format which would create
+    a full meshgrid.  This is appropriate when we have matched (T, P) pairs.
+    """
     n = len(T_arr)
     PT = np.empty(n, dtype=object)
     PT[:] = list(zip(P_arr, T_arr))
@@ -52,22 +64,27 @@ def compute_kauzmann_temperature(P_MPa, compute_batch,
 
     T_scan = np.linspace(T_scan_lo, T_scan_hi, n_scan)
 
-    # Evaluate liquid and ice entropy on full (T, P) meshgrid
+    # Evaluate liquid and ice entropy on the full (n_P × n_scan) meshgrid
+    # in a single vectorized call for speed.
     T_grid, P_grid = np.meshgrid(T_scan, P_arr)
     T_flat, P_flat = T_grid.ravel(), P_grid.ravel()
 
     S_liq = compute_batch(T_flat, P_flat)['S'].reshape(n_P, n_scan)
     S_ice = _sf_entropy(T_flat, P_flat).reshape(n_P, n_scan)
+    # dS > 0: liquid has more entropy (normal); dS = 0: Kauzmann point
     dS = S_liq - S_ice
 
-    # At each pressure, find the crossing nearest to 185 K
-    T_lo_list = []
-    T_hi_list = []
-    P_list = []
-    ip_map = []
+    # At each pressure, find all sign changes in dS and pick the one
+    # whose midpoint is closest to T_target.  Multiple crossings can
+    # occur (e.g. HDL Kauzmann ~185 K, LDL Kauzmann ~155 K).
+    T_lo_list = []   # lower bracket endpoints
+    T_hi_list = []   # upper bracket endpoints
+    P_list = []      # pressures with valid crossings
+    ip_map = []      # maps bracket index -> original pressure index
 
     for ip in range(n_P):
-        row = dS[ip]
+        row = dS[ip]     # dS vs T at this pressure
+        # Detect sign changes: product < 0 means dS crosses zero
         xings = []
         for j in range(n_scan - 1):
             if np.isfinite(row[j]) and np.isfinite(row[j + 1]) and row[j] * row[j + 1] < 0:
@@ -88,10 +105,12 @@ def compute_kauzmann_temperature(P_MPa, compute_batch,
     T_hi_b = np.array(T_hi_list)
     P_b = np.array(P_list)
 
-    # Vectorized bisection using both model and SeaFreeze
+    # Vectorized bisection: evaluate both models at each midpoint and
+    # narrow the bracket toward dS = 0.
+    # 30 iterations on a ~1 K bracket → precision ≈ 1/2^30 ≈ 1e-9 K.
     S_lo_liq = compute_batch(T_lo_b, P_b)['S']
     S_lo_ice = _sf_entropy(T_lo_b, P_b)
-    sign_lo = np.sign(S_lo_liq - S_lo_ice)
+    sign_lo = np.sign(S_lo_liq - S_lo_ice)  # track which side has dS > 0
 
     for _ in range(30):
         T_mid = 0.5 * (T_lo_b + T_hi_b)

@@ -25,23 +25,33 @@ def has_three_roots_vec(T_arr, P_arr, adapter):
     """
     Check whether F(x)=0 has 3 roots at each (T, P) pair.
 
+    F(x) is the equilibrium condition dG_mix/dx = 0.  Inside the spinodal
+    dome, G_mix(x) has two local minima and one maximum, giving three roots.
+    Outside the dome there is only one root (the equilibrium x).
+
+    The discriminant determines whether the inflection points of F(x) yield
+    a composition interval where three sign changes occur.
+
     Returns boolean array of same length as T_arr.
     """
     omega = adapter['omega_vec'](T_arr, P_arr)
     disc = adapter['disc_vec'](omega, T_arr, P_arr)
 
+    # omega > 0 and disc > 0 are necessary conditions for a spinodal dome
     valid = (omega > 0) & (disc > 0)
 
-    # Inflection points: x(1-x) = 1/(2*omega_eff)
-    # where omega_eff depends on the discriminant formula
+    # Inflection points of F(x) in composition space: these divide (0, 1)
+    # into intervals where F is monotonic, enabling bisection for each root.
     sqrt_disc = np.sqrt(np.where(disc > 0, disc, 1.0))
-    x_lo = (1.0 - sqrt_disc) / 2.0
-    x_hi = (1.0 + sqrt_disc) / 2.0
+    x_lo = (1.0 - sqrt_disc) / 2.0   # lower inflection composition
+    x_hi = (1.0 + sqrt_disc) / 2.0   # upper inflection composition
 
     EPS = 1e-12
     ones = np.ones_like(T_arr)
     F_eq = adapter['F_eq_vec']
 
+    # Evaluate F at interval boundaries: (EPS, x_lo, x_hi, 1-EPS)
+    # Three roots exist iff F changes sign in each of the three sub-intervals
     f1 = F_eq(EPS * ones, T_arr, P_arr)
     f2 = F_eq(x_lo, T_arr, P_arr)
     f3 = F_eq(x_hi, T_arr, P_arr)
@@ -70,7 +80,8 @@ def find_roots_vec(T_arr, P_arr, adapter):
     F_eq = adapter['F_eq_vec']
     n = len(T_arr)
 
-    # ── Root 1: bisect x in (EPS, x_infl_lo) ────────────────────────────
+    # ── Root 1 (HDL-like, x ≈ 0): bisect in (EPS, x_infl_lo) ──────────
+    # 35 iterations on (0, 0.5) yields precision ≈ 0.5/2^35 ≈ 1.5e-11
     x_lo1 = np.full(n, EPS)
     x_hi1 = x_infl_lo.copy()
     f_a1 = F_eq(x_lo1, T_arr, P_arr)
@@ -85,7 +96,7 @@ def find_roots_vec(T_arr, P_arr, adapter):
 
     x1 = np.where(valid, (x_lo1 + x_hi1) / 2.0, np.nan)
 
-    # ── Root 3: bisect x in (x_infl_hi, 1-EPS) ─────────────────────────
+    # ── Root 3 (LDL-like, x ≈ 1): bisect in (x_infl_hi, 1-EPS) ────────
     x_lo3 = x_infl_hi.copy()
     x_hi3 = np.full(n, 1.0 - EPS)
     f_a3 = F_eq(x_lo3, T_arr, P_arr)
@@ -337,6 +348,9 @@ def compute_binodal_fast(p_arr, spinodal, adapter):
     scan_valid = T_hi_bound > T_lo_bound
 
     # ── Scan phase: evaluate delta_g at multiple temperatures ────────────
+    # delta_g = g_mix(x3) - g_mix(x1) is the Gibbs energy difference between
+    # the LDL-like (x3) and HDL-like (x1) minima of G_mix(x).  The binodal
+    # is where delta_g = 0 (equal Gibbs energy = thermodynamic coexistence).
     # Use geometric spacing from T_upper downward so the scan concentrates
     # resolution near the upper spinodal — where the binodal actually lives
     # for near-LLCP pressures.
@@ -407,6 +421,7 @@ def compute_binodal_fast(p_arr, spinodal, adapter):
     g3 = adapter['g_mix_vec'](x3, T_lo_b, p_bix)
     dg_lo = g3 - g1
 
+    # 25 iterations on a ~1 K bracket → precision ≈ 1/2^25 ≈ 3e-8 K
     for _ in range(25):
         T_mid = (T_lo_b + T_hi_b) / 2.0
         x1, x3 = find_roots_vec(T_mid, p_bix, adapter)

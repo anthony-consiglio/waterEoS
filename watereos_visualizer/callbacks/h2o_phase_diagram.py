@@ -47,6 +47,7 @@ def _ensure_computed():
 
 
 def _apply_style_2d(fig, settings):
+    """Apply the user's theme (background, font, grid) to a 2D phase diagram figure."""
     s = settings or DEFAULTS
     bg = s.get('bg_color', DEFAULTS['bg_color'])
     fs = s.get('font_size', DEFAULTS['font_size'])
@@ -75,6 +76,7 @@ def _apply_style_2d(fig, settings):
 
 
 def _apply_style_3d(fig, settings):
+    """Apply the user's theme to a 3D phase diagram figure."""
     s = settings or DEFAULTS
     bg = s.get('bg_color', DEFAULTS['bg_color'])
     fs = s.get('font_size', DEFAULTS['font_size'])
@@ -117,6 +119,7 @@ def register(app):
          Input('settings-store', 'data')],
     )
     def display(projection, vmin, vmax, tmin, tmax, pmin, pmax, settings):
+        """Return the cached figure for the chosen projection, styled and axis-clipped."""
         _ensure_computed()
 
         cached = _FIGURES.get(projection)

@@ -1,5 +1,21 @@
 """
 Computation helpers — wraps watereos.getProp and phase diagram functions.
+
+This module provides two layers of computation:
+
+1. **Property evaluation** (``compute_property_curves``, ``compute_property_surface``,
+   ``compute_multi_model_curves``, ``compute_point_properties``) — thin wrappers
+   around ``watereos.getProp`` that handle grid construction and output reshaping.
+
+2. **Phase diagram assembly** (``compute_phase_diagram_data``) — orchestrates
+   model-dependent curves (spinodal, binodal, TMD, Widom) and model-independent
+   curves (IAPWS melting, nucleation, Kauzmann) into a single dict used by the
+   web app's EoS Phase Diagram tab.
+
+All curves are computed on 1-D pressure arrays and returned as ``{'T_K': ...,
+'p_MPa': ...}`` dicts.  Vectorised numpy operations are preferred for speed;
+SeaFreeze calls use scatter mode (object arrays of (P, T) tuples) where grid
+mode is unavailable.
 """
 
 import json
@@ -287,6 +303,7 @@ def compute_phase_diagram_data(model_key, n_pressures=150,
         'nucleation_ih': nuc['ih'],
         'nucleation_iii': nuc['iii'],
         'kauzmann': kauzmann,
+        # Ice Ih / Ice III / liquid triple point (IAPWS R14-08)
         'triple_point': {'T_K': 251.165, 'p_MPa': 209.9},
     }
     _phase_diagram_cache[model_key] = result
@@ -319,6 +336,8 @@ def _compute_tmd_curve(model_key, llcp=None, n_points=80,
     """
     compute_batch = _get_compute_batch(model_key)
     info = MODEL_REGISTRY[model_key]
+    # TMD extends to negative pressures (stretched/metastable water).
+    # Caupin (2019) is validated to -140 MPa; others are extrapolated.
     P_lo = -140.0
     P_hi = min(info.P_max, 300.0)
 
@@ -337,7 +356,11 @@ def _compute_tmd_curve(model_key, llcp=None, n_points=80,
     except Exception:
         return None
 
-    # --- Find last (highest-T) sign change along T axis for each pressure ---
+    # --- Find the highest-T sign change in alpha for each pressure ---
+    # Alpha (thermal expansivity) changes sign at the TMD: alpha > 0 below
+    # the TMD (normal expansion) and alpha < 0 above it (anomalous contraction).
+    # Multiple crossings may exist at low T; we want the *highest-T* one,
+    # which is the physical temperature of maximum density (~277 K at 0.1 MPa).
     valid = ~np.isnan(alpha_grid[:, :-1]) & ~np.isnan(alpha_grid[:, 1:])
     sign_change = (alpha_grid[:, :-1] * alpha_grid[:, 1:] < 0) & valid
 
@@ -345,15 +368,17 @@ def _compute_tmd_curve(model_key, llcp=None, n_points=80,
     if not has_change.any():
         return None
 
-    # Flip along T axis, argmax finds first-from-right, convert back
+    # To find the *last* (rightmost / highest-T) sign change per row,
+    # reverse each row so argmax finds the first True from the right,
+    # then convert the reversed index back to the original column index.
     n_cols = sign_change.shape[1]  # n_T_scan - 1
     flipped = sign_change[:, ::-1]
     last_from_right = flipped.argmax(axis=1)
     last_idx = (n_cols - 1) - last_from_right
 
     mask = has_change
-    row_idx = np.where(mask)[0]
-    j_bracket = last_idx[mask]
+    row_idx = np.where(mask)[0]        # pressure indices with a crossing
+    j_bracket = last_idx[mask]          # T-column index of the bracket
 
     P_bracket = P_pts[mask]
     T_lo_bracket = T_scan[j_bracket]
@@ -364,12 +389,16 @@ def _compute_tmd_curve(model_key, llcp=None, n_points=80,
     sign_lo = np.sign(alpha_at_lo)
 
     # --- Vectorized bisection: refine all brackets simultaneously ---
+    # Each iteration halves the bracket width.  15 iterations on a ~3 K
+    # initial bracket yields precision ~3/2^15 ≈ 1e-4 K.
     for _ in range(bisection_iters):
         T_mid = 0.5 * (T_lo_bracket + T_hi_bracket)
         batch_mid = compute_batch(T_mid, P_bracket)
         alpha_mid = batch_mid['alpha']
 
         nan_mid = np.isnan(alpha_mid)
+        # If alpha_mid has the same sign as the lower bracket, the root
+        # lies above T_mid → move T_lo up.  Otherwise move T_hi down.
         same_sign = np.sign(alpha_mid) == sign_lo
         update = ~nan_mid
         T_lo_bracket = np.where(update & same_sign, T_mid, T_lo_bracket)
@@ -403,11 +432,14 @@ def _compute_widom_line(model_key, llcp, n_points=60,
     if P_lo >= P_hi:
         return None
 
+    # Scan pressures from just below LLCP downward (toward ambient)
     P_pts = np.linspace(P_hi, P_lo, n_points)
 
-    # Compute the per-pressure T window bounds to determine global range
-    dP = P_llcp - P_pts
-    T_centers = T_llcp + dP * slope
+    # Estimate where the Cp peak lies at each pressure using a linear
+    # extrapolation from the LLCP.  The Widom line slopes roughly
+    # dT/dP ≈ 0.3 K/MPa for these models, so T_peak ≈ T_llcp + dP*slope.
+    dP = P_llcp - P_pts  # distance below LLCP (positive)
+    T_centers = T_llcp + dP * slope  # predicted Cp peak T at each P
     T_global_lo = max(float(np.min(T_centers)) - window, info.T_min)
     T_global_hi = min(float(np.max(T_centers)) + window, info.T_max)
 
@@ -422,12 +454,16 @@ def _compute_widom_line(model_key, llcp, n_points=60,
         return None
 
     # --- Per-pressure window mask: restrict each row to [T_center±window] ---
+    # Without windowing, the global Cp max might be at an unrelated
+    # temperature (e.g. near the spinodal).  The window focuses the search
+    # on the Widom-line vicinity predicted by the linear extrapolation.
     T_lo_per_P = np.maximum(T_centers - window, info.T_min)[:, np.newaxis]
     T_hi_per_P = np.minimum(T_centers + window, info.T_max)[:, np.newaxis]
     T_row = T_scan[np.newaxis, :]
     window_mask = (T_row >= T_lo_per_P) & (T_row <= T_hi_per_P)
 
-    # Replace out-of-window and NaN values with -inf for argmax
+    # Replace out-of-window and NaN values with -inf so argmax ignores them
+    # (np.nanargmax doesn't support masking; -inf is a valid float for argmax)
     Cp_masked = np.where(window_mask & ~np.isnan(Cp_grid), Cp_grid, -np.inf)
 
     # Find argmax per pressure
@@ -435,7 +471,8 @@ def _compute_widom_line(model_key, llcp, n_points=60,
     peak_Cp = Cp_masked[np.arange(n_points), idx_max]
     has_valid = peak_Cp > -np.inf
 
-    # Interior check: peak must not be at the edge of the valid window
+    # Interior check: reject peaks sitting at the very edge of the window,
+    # which are likely artefacts of the windowing rather than true Cp maxima.
     first_valid = np.argmax(window_mask, axis=1)
     last_valid = n_T_scan - 1 - np.argmax(window_mask[:, ::-1], axis=1)
     interior = (idx_max > first_valid) & (idx_max < last_valid) & has_valid
@@ -453,13 +490,19 @@ def _compute_widom_line(model_key, llcp, n_points=60,
 # ---------------------------------------------------------------------------
 
 def _ice_ih_liquidus(n_points=100):
-    """IAPWS Ice Ih melting pressure equation."""
-    T_star = 273.16    # K
-    p_star = 611.657e-6  # MPa
+    """IAPWS Ice Ih melting pressure equation.
+
+    Reference: IAPWS R14-08(2011), Eq. 1.
+    pi = P/p* = 1 + sum_i a_i * (1 - theta^b_i),  theta = T/T*
+    """
+    T_star = 273.16        # K  (triple point temperature)
+    p_star = 611.657e-6    # MPa (triple point pressure)
+    # Coefficients from IAPWS R14-08, Table 1 (Ice Ih)
     a1, b1 = 0.119539337e7, 3.0
     a2, b2 = 0.808183159e5, 25.75
     a3, b3 = 0.333826860e4, 103.75
 
+    # Range: Ih/III/Liq triple point (251.165 K) to Ih/Liq/Vapour triple point
     T = np.linspace(251.165, 273.16, n_points)
     theta = T / T_star
     pi = 1.0 + a1 * (1.0 - theta**b1) + a2 * (1.0 - theta**b2) + a3 * (1.0 - theta**b3)
@@ -474,7 +517,8 @@ def _ice_iii_liquidus(n_points=50):
     Valid from 251.165 K (Ih/III/Liquid triple point) to
     256.164 K (III/V/Liquid triple point).
     """
-    T_star = 251.165  # K
+    # Coefficients from IAPWS R14-08, Table 3 (Ice III)
+    T_star = 251.165  # K  (Ih/III/Liq triple point)
     p_star = 208.566  # MPa
     a, b = 0.299948, 60.0
 
@@ -565,22 +609,28 @@ def _compute_kauzmann_curve(model_key, P_range=(0.0, 300.0), n_points=80,
     except Exception:
         return None
 
+    # dS > 0 means the liquid has more entropy than ice (normal).
+    # dS = 0 is the Kauzmann point: liquid entropy equals ice entropy.
     dS = S_liq - S_ice
 
-    # At each pressure, find crossing nearest to T_target
+    # At each pressure, find the sign-change in dS nearest to T_target.
+    # Multiple crossings may exist (e.g. HDL Kauzmann ~185 K, LDL ~155 K).
+    # T_target selects which branch to track.
     T_lo_list = []
     T_hi_list = []
     P_list = []
     ip_map = []
 
-    for ip in range(n_points):
-        row = dS[ip]
+    for ip in range(n_points):          # ip = pressure index
+        row = dS[ip]                     # dS vs T at this pressure
+        # Find all indices j where dS changes sign between T_scan[j] and T_scan[j+1]
         xings = []
         for j in range(n_scan - 1):
             if (np.isfinite(row[j]) and np.isfinite(row[j + 1])
                     and row[j] * row[j + 1] < 0):
                 xings.append(j)
         if xings:
+            # Pick the crossing whose midpoint is closest to T_target
             best_j = min(xings,
                          key=lambda j: abs(0.5 * (T_scan[j] + T_scan[j + 1]) - T_target))
             T_lo_list.append(T_scan[best_j])
@@ -595,11 +645,13 @@ def _compute_kauzmann_curve(model_key, P_range=(0.0, 300.0), n_points=80,
     T_hi_b = np.array(T_hi_list)
     P_b = np.array(P_list)
 
-    # Vectorized bisection
+    # --- Vectorized bisection to refine Kauzmann T at each pressure ---
     batch_lo = compute_batch(T_lo_b, P_b)
     S_lo_liq = batch_lo[S_key]
 
-    # SeaFreeze for bisection points — use scatter mode (small arrays)
+    # SeaFreeze scatter mode: an object array of (P, T) tuples.
+    # Grid mode would create a full meshgrid, but here we need matched
+    # pairs for point-by-point bisection.
     def _sf_S(T_arr, P_arr):
         n = len(T_arr)
         PT = np.empty(n, dtype=object)
@@ -610,10 +662,12 @@ def _compute_kauzmann_curve(model_key, P_range=(0.0, 300.0), n_points=80,
     S_lo_ice = _sf_S(T_lo_b, P_b)
     sign_lo = np.sign(S_lo_liq - S_lo_ice)
 
+    # 30 bisection iterations on a ~1 K bracket → precision ≈ 1/2^30 ≈ 1e-9 K
     for _ in range(30):
         T_mid = 0.5 * (T_lo_b + T_hi_b)
         S_mid_liq = compute_batch(T_mid, P_b)[S_key]
         S_mid_ice = _sf_S(T_mid, P_b)
+        # Keep the half-bracket that still contains the root (sign change)
         same = np.sign(S_mid_liq - S_mid_ice) == sign_lo
         T_lo_b = np.where(same, T_mid, T_lo_b)
         T_hi_b = np.where(~same, T_mid, T_hi_b)

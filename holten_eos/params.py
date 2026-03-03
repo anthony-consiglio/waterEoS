@@ -33,7 +33,9 @@ k1 = -0.31569232
 k2 = 5.2992608
 
 # ── Background coefficients (Table 7) ────────────────────────────────────
-# 20 terms: c[i], a[i], b[i], d[i]
+# 20 terms in the background Gibbs energy:
+#   B = sum_i c[i] * tau^a[i] * pi^b[i] * exp(-d[i]*pi)
+# where tau = T/Tc, pi = (P-P0)/P_scale.
 c_bg = np.array([
     -8.1570681381655, 1.2875032e+000, 7.0901673598012,
     -3.2779161e-002, 7.3703949e-001, -2.1628622e-001, -5.1782479e+000,

@@ -18,6 +18,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def from_phase_click(click_data):
+        """Auto-fill T and P inputs when the user clicks a point on the EoS Phase Diagram."""
         if not click_data:
             return no_update, no_update
         T = click_data.get('T')
@@ -38,6 +39,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def calculate(n_clicks, T, P, model_keys, settings):
+        """Evaluate all properties at a single (T, P) point and build the results table."""
         if not model_keys or T is None or P is None:
             return no_update, no_update, 'Provide T, P, and at least one model.'
 

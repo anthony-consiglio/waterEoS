@@ -113,28 +113,30 @@ def compute_properties(T_K, p_MPa):
     C, C_T, C_TT = _C_all(T)
     cp0 = _cp0(T)
 
-    # Step 2 — Placeholders (eqs A.10, A.25-A.32)
+    # Step 2 — Intermediate quantities (Appendix A of the reference)
+    # BP = B + P is the shifted pressure variable in the Tait-Tammann equation
     BP = B + P_Pa
     BP0 = B + P.P0
-    E = math.log(BP / BP0)                         # A.10
-    F = B_T / BP                                    # A.25
-    G_fn = B_T / BP0                                # A.26
-    H_fn = B_TT / BP                                # A.30
-    I_fn = B_T**2 / BP**2                           # A.31
-    G_fn_T = B_TT / BP0 - B_T**2 / BP0**2          # A.32
+    E = math.log(BP / BP0)                         # A.10: log pressure ratio
+    F = B_T / BP                                    # A.25: dB/dT normalised by BP
+    G_fn = B_T / BP0                                # A.26: dB/dT normalised by BP0
+    H_fn = B_TT / BP                                # A.30: d²B/dT² normalised by BP
+    I_fn = B_T**2 / BP**2                           # A.31: (dB/dT)² normalised by BP²
+    G_fn_T = B_TT / BP0 - B_T**2 / BP0**2          # A.32: dG_fn/dT
 
-    # Step 3 — Auxiliary integrals (eqs A.39-A.45)
+    # Step 3 — Auxiliary integrals for thermodynamic path integration
+    # (needed for entropy, enthalpy, and heat capacity; Eqs. A.39-A.45)
     dP = P_Pa - P.P0
-    J = BP * (E - 1.0) + BP0                        # A.39
-    K = B_T * E                                     # A.40
-    L = B_TT * E                                    # A.41
-    M = -B_T**2 * (1.0/BP - 1.0/BP0)               # A.42
-    R = dP - C * J                                  # A.43
-    # Q — CORRECTED sign (correction paper)
-    Q = -C * K + C * G_fn * dP - C_T * J            # A.44
+    J = BP * (E - 1.0) + BP0                        # A.39: ∫C·(B+P')⁻¹ dP' term
+    K = B_T * E                                     # A.40: T-derivative of J
+    L = B_TT * E                                    # A.41: second T-derivative
+    M = -B_T**2 * (1.0/BP - 1.0/BP0)               # A.42: mixed-derivative term
+    R = dP - C * J                                  # A.43: volume integral
+    # Q — CORRECTED sign (correction paper, Eq. A.44)
+    Q = -C * K + C * G_fn * dP - C_T * J            # A.44: entropy-related integral
     N = (-C * L + C * M + C * G_fn_T * dP
          - 2.0 * C_T * K + 2.0 * C_T * G_fn * dP
-         - C_TT * J)                                # A.45
+         - C_TT * J)                                # A.45: Cp-related integral
 
     # Step 4 — Physical properties
     v = v0 * (1.0 - C * E)                          # eq 1
@@ -156,7 +158,10 @@ def compute_properties(T_K, p_MPa):
     vel = math.sqrt(v / kappa_S)                    # eq 5 / A.55
 
     # Step 5 — Thermodynamic potentials via path integration
-    # Temperature leg: (T0, P0) -> (T, P0)
+    # Reference state: (T0, P0) = (273.15 K, 0.1 MPa), matching IAPWS-95.
+    # Temperature leg: (T0, P0) -> (T, P0) using cp0(T) = d1·exp(d2·T) + d3
+    # expi() is the exponential integral Ei(x) = ∫_{-∞}^x e^t/t dt,
+    # arising from ∫ exp(d2·T)/T dT in the entropy integral.
     dh_T = (P.d1 / P.d2) * (math.exp(P.d2 * T) - math.exp(P.d2 * P.T0)) + P.d3 * (T - P.T0)
     ds_T = P.d1 * (expi(P.d2 * T) - expi(P.d2 * P.T0)) + P.d3 * math.log(T / P.T0)
 

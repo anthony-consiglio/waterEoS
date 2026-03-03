@@ -123,6 +123,90 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
 - `getProp()` and `compute()` issue a `UserWarning` when inputs fall outside the suggested validity range. Results outside these ranges may be unphysical (e.g., negative compressibility or heat capacity).
 
+## Choosing a Model
+
+| If you need… | Use | Why |
+|--------------|-----|-----|
+| General thermodynamics (250–370 K, moderate pressures) | `duska2020` | Broadest T range, volume-additive mixing, fast Rust backend |
+| Deeply supercooled regime (200–300 K) at positive pressures | `holten2014` or `caupin2019` | Foundational two-state models; Holten is the most widely cited |
+| Negative pressures / stretched water | `caupin2019` | Only model validated to &minus;140 MPa |
+| Viscosity, diffusion, or rotational correlation time | `singh2017` | Only model with transport properties; uses Holten thermodynamics |
+| Empirical correlation without two-state assumptions | `grenke2025` | Tait-Tammann fit; no `x`, `_A`, `_B` outputs |
+| IAPWS-95 reference data or temperatures above 370 K | `IAPWS95` or `water1` | International standard; valid 240–501 K, 0–2300 MPa |
+
+**If unsure, start with `duska2020`.** It covers the widest temperature range and includes both the supercooled anomalies and ambient conditions.
+
+## Key Concepts
+
+<details>
+<summary><strong>Two-state model</strong></summary>
+
+A theoretical framework that treats liquid water as a mixture of two
+interconvertible local structures:
+- **State A (HDL)** — high-density liquid, disordered hydrogen-bond network
+- **State B (LDL)** — low-density liquid, tetrahedral ice-like network
+
+The equilibrium fraction of LDL is denoted **x** (ranges from 0 to 1).
+At low temperatures x increases, driving the density anomalies. Outputs
+suffixed `_A` and `_B` give individual-state properties; unsuffixed
+outputs are the equilibrium mixture.
+</details>
+
+<details>
+<summary><strong>Liquid–liquid critical point (LLCP)</strong></summary>
+
+The predicted critical point at the top of the liquid–liquid coexistence
+dome, analogous to the vapor–liquid critical point but between HDL and
+LDL phases. Each two-state model places it at a different (T, P): Holten
+at (228 K, 0 MPa), Caupin at (218 K, 72 MPa), Duska at (221 K, 54 MPa).
+The LLCP has not yet been directly observed experimentally.
+</details>
+
+<details>
+<summary><strong>Spinodal</strong></summary>
+
+The thermodynamic stability limit: the curve in (T, P) space where the
+compressibility diverges and the free energy has an inflection point. Beyond
+the spinodal, the system is unstable and must separate into two phases.
+Two-state models have both an **HDL spinodal** and an **LDL spinodal**.
+</details>
+
+<details>
+<summary><strong>Binodal</strong></summary>
+
+The liquid–liquid coexistence curve (also called the liquid–liquid
+transition line, LLTL): the set of (T, P) points where HDL and LDL
+have equal Gibbs energy and can coexist in equilibrium. Lies between
+the two spinodals.
+</details>
+
+<details>
+<summary><strong>Temperature of maximum density (TMD)</strong></summary>
+
+The temperature at which water's density reaches a maximum at a given
+pressure (equivalently, where the thermal expansivity &alpha; = 0).
+At 0.1 MPa this is about 277 K (4 °C). The TMD line shifts to lower
+temperatures at higher pressures.
+</details>
+
+<details>
+<summary><strong>Widom line</strong></summary>
+
+A line of maximum correlation length emanating from the LLCP into the
+one-phase region. In practice it is traced as the locus of isobaric
+heat capacity (Cp) maxima. It marks the crossover between HDL-like and
+LDL-like behavior above the critical pressure.
+</details>
+
+<details>
+<summary><strong>Kauzmann temperature</strong></summary>
+
+The temperature at which the entropy of the supercooled liquid equals
+that of ice Ih at the same pressure. Below this temperature the liquid
+would have lower entropy than the crystal — an apparent paradox — so it
+serves as a thermodynamic lower bound on the metastable liquid.
+</details>
+
 ## Usage
 
 ### Grid Mode
@@ -250,6 +334,72 @@ Throughput on a 10,000-point grid (100 pressures x 100 temperatures):
 | Singh (2017) | 32 ms (309k pts/s) | -- | -- |
 
 The Rust backend is used automatically when installed (included in pre-built wheels). Pure Python is used as a fallback.
+
+## Troubleshooting
+
+<details>
+<summary><strong>I'm getting NaN or Inf values</strong></summary>
+
+You are likely evaluating outside the model's physically meaningful range.
+Check the [Validity Ranges](#validity-ranges) table. Two-state models
+accept any (T, P) without raising errors, but they may return `NaN` for
+properties that cannot be computed (e.g., speed of sound when the bulk
+modulus is negative). Try narrowing your temperature or pressure range,
+or switching to a model with a broader validity domain.
+</details>
+
+<details>
+<summary><strong>I got a UserWarning about temperatures outside the suggested range</strong></summary>
+
+This is expected — `getProp()` and `compute()` issue a warning when inputs
+fall outside the model's paper-stated validity range. The computation
+still runs, but results may be unphysical. If you are intentionally
+extrapolating, you can suppress the warning:
+
+```python
+import warnings
+warnings.filterwarnings('ignore', message='waterEoS')
+```
+</details>
+
+<details>
+<summary><strong>Results look wrong or differ between models</strong></summary>
+
+Different models are fitted to different data sets and use different
+mixing rules, so they will not agree exactly — especially in the deeply
+supercooled regime below ~240 K where experimental data is scarce. Use
+the [Model Comparison](https://watereos-visualizer.up.railway.app) tool
+in the web app to visualize where models diverge. At ambient conditions
+(273–373 K, 0.1 MPa), all models agree closely with IAPWS-95.
+</details>
+
+<details>
+<summary><strong>What are the _A and _B properties?</strong></summary>
+
+Two-state models decompose water into State A (HDL, high-density liquid)
+and State B (LDL, low-density liquid). Properties like `rho_A` and
+`rho_B` are the densities of the individual states at that (T, P);
+`rho` (no suffix) is the equilibrium mixture density. The mixing
+fraction `x` gives the fraction of LDL (State B). Only two-state
+models (`holten2014`, `caupin2019`, `duska2020`, `singh2017`) provide
+these outputs; `grenke2025`, `water1`, and `IAPWS95` do not.
+</details>
+
+<details>
+<summary><strong>Which backend am I using (Rust or Python)?</strong></summary>
+
+The Rust backend is selected automatically when the compiled extension
+is available (included in pre-built PyPI wheels). To check:
+
+```python
+from watereos import compute
+out = compute(273.15, 0.1, 'duska2020')
+# If using Rust, computation is 2-5x faster; no visible difference in output
+```
+
+If you installed from source without a Rust toolchain, the pure Python
+fallback is used. Results are identical; only speed differs.
+</details>
 
 ## References
 

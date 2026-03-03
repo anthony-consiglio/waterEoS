@@ -15,7 +15,8 @@ where f = x (LDS fraction from the backbone two-state thermodynamic model).
 # Common parameters (shared by all three transport properties)
 # ---------------------------------------------------------------------------
 T_ref = 273.15      # K, reference temperature
-T_0 = 147.75        # K, VFT-like singularity temperature
+T_0 = 147.75        # K, VFT (Vogel-Fulcher-Tammann) singularity temperature
+                     # (HDS term diverges as T -> T_0; physical: glass transition)
 k_B = 1.380649e-23  # J/K, Boltzmann constant
 
 
@@ -27,7 +28,7 @@ E_LDS_k_eta = 2262.0    # K  (E_LDS / k_B)
 E_HDS_k_eta = 421.9     # K  (E_HDS / k_B)
 dv_HDS_eta = 2.44e-30   # m^3
 nu_eta = 0.5
-eps_eta = +1
+eps_eta = +1             # eps = +1: property increases with structure ordering
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +39,7 @@ E_LDS_k_D = 1984.0      # K
 E_HDS_k_D = 402.2       # K
 dv_HDS_D = 1.79e-30     # m^3
 nu_D = 0.5
-eps_D = -1
+eps_D = -1               # eps = -1: property decreases with structure ordering
 
 
 # ---------------------------------------------------------------------------

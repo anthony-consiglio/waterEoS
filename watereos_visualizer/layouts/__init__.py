@@ -1,3 +1,10 @@
+"""Layout definitions for each web app tab.
+
+Every module exposes a ``layout()`` function that returns the Dash
+component tree for that tab.  Layouts are imported here under
+``<name>_layout`` aliases for use in ``app.py``.
+"""
+
 from .info import layout as info_layout
 from .property_explorer import layout as property_explorer_layout
 from .phase_diagram import layout as phase_diagram_layout

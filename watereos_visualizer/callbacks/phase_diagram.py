@@ -1,4 +1,10 @@
-"""Tab: EoS Phase Diagram — callbacks."""
+"""Tab: EoS Phase Diagram — callbacks.
+
+Computes and renders the liquid--liquid phase diagram in the T--P plane
+for two-state models.  The computation result is serialized to
+``pd-store`` so that toggling individual curves or changing style
+settings triggers only a re-render, not a re-computation.
+"""
 
 import numpy as np
 import plotly.graph_objects as go
@@ -57,6 +63,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def toggle_manual(auto):
+        """Show or hide the manual T/P range inputs based on the auto-limits checkbox."""
         if auto:
             return {'display': 'none'}
         return {'display': 'block'}
@@ -69,6 +76,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def compute(n_clicks, model_key):
+        """Run the phase diagram computation and store the serialized result."""
         if not model_key:
             return no_update, ''
         try:
@@ -92,6 +100,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def replot(pd_data, show, auto_limits, tmin, tmax, pmin, pmax, settings):
+        """Rebuild the figure from stored data, showing only the selected curves."""
         if not pd_data:
             return _empty_figure(settings)
 
@@ -179,6 +188,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def capture_click(click_data):
+        """Forward a graph click's (T, P) to the Point Calculator via the shared store."""
         if not click_data or 'points' not in click_data:
             return no_update
         pt = click_data['points'][0]
@@ -186,6 +196,7 @@ def register(app):
 
 
 def _empty_figure(settings=None):
+    """Return a placeholder figure with a 'Click Compute' annotation."""
     settings = settings or DEFAULTS
     fig = go.Figure()
     layout = make_layout(settings, title='EoS Phase Diagram',
@@ -209,6 +220,7 @@ _ALL_KEYS = [
 
 
 def _serialize_pd(pd_data):
+    """Convert phase diagram arrays to JSON-serializable lists for ``dcc.Store``."""
     result = {}
     for key in _ALL_KEYS:
         if key not in pd_data or pd_data[key] is None:
@@ -228,6 +240,7 @@ def _serialize_pd(pd_data):
 
 
 def _deserialize_pd(pd_data):
+    """Restore numpy arrays from the JSON-serialized phase diagram dict."""
     result = {}
     for key in _ALL_KEYS:
         if key not in pd_data or pd_data[key] is None:

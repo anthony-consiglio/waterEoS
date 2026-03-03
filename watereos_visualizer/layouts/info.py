@@ -62,6 +62,24 @@ All settings are saved in your browser's local storage and persist across sessio
 
 ---
 
+## Key Concepts
+
+**Two-state model** — A framework that treats liquid water as a mixture of two local structures: **State A (HDL)**, a high-density disordered network, and **State B (LDL)**, a low-density tetrahedral network. The equilibrium LDL fraction is **x** (0 to 1). Properties suffixed `_A` and `_B` are per-state values; unsuffixed properties are the equilibrium mixture.
+
+**Liquid--liquid critical point (LLCP)** — The predicted critical point at the top of the HDL/LDL coexistence dome. Each two-state model places it at a different (T, P). It has not been directly observed experimentally.
+
+**Spinodal** — The stability limit where compressibility diverges. Beyond the spinodal, the liquid is mechanically unstable and must phase-separate. Two-state models have both an HDL spinodal and an LDL spinodal.
+
+**Binodal (LLTL)** — The liquid--liquid coexistence curve where HDL and LDL have equal Gibbs energy. Lies between the two spinodals.
+
+**Temperature of maximum density (TMD)** — Where water's density peaks at a given pressure (thermal expansivity = 0). About 277 K (4 C) at 0.1 MPa; shifts to lower T at higher pressures.
+
+**Widom line** — A line of Cp maxima extending from the LLCP into the one-phase region, marking the crossover between HDL-like and LDL-like behavior.
+
+**Kauzmann temperature** — Where the liquid's entropy equals that of ice Ih. Serves as a thermodynamic lower bound on the metastable liquid.
+
+---
+
 ## Available Models
 
 | Model key | Reference | LLCP (T, P) |

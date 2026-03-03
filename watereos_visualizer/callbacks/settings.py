@@ -36,6 +36,7 @@ def register(app):
                         line_w, phase_lw, font_sz, grid_checked, bg,
                         u_density, u_volume, u_energy, u_entropy,
                         u_bulk, u_viscosity, reset_clicks):
+        """Collect all settings controls into a single dict and write to ``settings-store``."""
         from dash import callback_context
         ctx = callback_context
         if ctx.triggered and ctx.triggered[0]['prop_id'] == 'st-reset.n_clicks':
@@ -81,6 +82,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def reset_controls(n):
+        """Reset all settings controls to their default values."""
         return (
             DEFAULTS['curve_palette'],
             DEFAULTS['surface_cmap'],
@@ -106,6 +108,7 @@ def register(app):
         prevent_initial_call=False,
     )
     def update_preview(settings):
+        """Render the live preview plot reflecting the current settings."""
         settings = settings or DEFAULTS
         palette_name = settings.get('curve_palette', DEFAULTS['curve_palette'])
         palette = PALETTE_OPTIONS.get(palette_name, PALETTE_OPTIONS['Biostasis'])

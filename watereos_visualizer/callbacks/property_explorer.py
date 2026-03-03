@@ -1,4 +1,23 @@
-"""Tab 1: Property Explorer — callbacks."""
+"""Tab 1: Property Explorer — callbacks.
+
+Architecture
+------------
+Computation and rendering are separated into two callback stages
+connected by a ``dcc.Store`` (``pe-data-store``):
+
+1. **Compute** (``compute_and_store``) — triggered by the *Update Plot*
+   button.  Calls the waterEoS computation layer, packs the results
+   into a JSON-serializable dict, and writes it to the store.  The
+   dict includes a ``'mode'`` key (``'curves'``, ``'surface2d'``, or
+   ``'surface3d'``) that selects the renderer.
+
+2. **Render** (``render_plot``) — triggered whenever the store or the
+   settings change.  Reads the stored data, applies unit conversions
+   and style settings, and returns a Plotly figure.
+
+This two-stage pattern lets the user change visual settings (palette,
+units, etc.) without re-running the expensive computation.
+"""
 
 import numpy as np
 import plotly.graph_objects as go
@@ -32,6 +51,8 @@ def _error_figure(message, settings=None):
 
 
 def register(app):
+    """Attach all Property Explorer callbacks to *app*."""
+
     # --- Update property dropdown when model changes ---
     @app.callback(
         [Output('pe-property', 'data'),
@@ -45,6 +66,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def update_model(model_key):
+        """Populate the property dropdown and T/P defaults when the model changes."""
         if not model_key or model_key not in MODEL_REGISTRY:
             return no_update, no_update, no_update, no_update, no_update, no_update, no_update
         info = MODEL_REGISTRY[model_key]
@@ -64,6 +86,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def toggle_zaxis(mode):
+        """Show the Z/Color Axis dropdown only in surface display modes."""
         if mode == 'curves':
             return {'display': 'none'}
         return {'display': 'block'}
@@ -89,6 +112,7 @@ def register(app):
     def compute_and_store(n_clicks, model_key, prop_key, tmin, tmax, pmin, pmax,
                           n_curves, n_points, curve_type, display_mode, z_choice,
                           show_phase):
+        """Run the EoS computation and write results to ``pe-data-store``."""
         if not model_key or not prop_key:
             return no_update
 
@@ -128,6 +152,7 @@ def register(app):
         prevent_initial_call=True,
     )
     def render_plot(pe_data, settings, z_choice):
+        """Build a Plotly figure from stored data, applying unit conversions and style."""
         if not pe_data:
             return no_update
 
@@ -167,6 +192,7 @@ def register(app):
     )
     def download_csv(n_clicks, model_key, prop_key, tmin, tmax, pmin, pmax,
                      n_curves, n_points, curve_type, settings):
+        """Export the current curve data as a CSV file download."""
         if not model_key or not prop_key:
             return no_update
 
@@ -200,6 +226,7 @@ def register(app):
 
 def _store_curves(model_key, prop_key, T_range, P_range,
                   n_curves, n_points, isobar_mode, show_phase):
+    """Compute isobars/isotherms and return a JSON-serializable dict for the store."""
     data = compute_property_curves(
         model_key, prop_key, T_range, P_range, n_curves, n_points, isobar_mode)
 
@@ -233,6 +260,7 @@ def _store_curves(model_key, prop_key, T_range, P_range,
 
 def _store_surface_2d(model_key, prop_key, T_range, P_range,
                       n_points, z_choice, show_phase):
+    """Compute a 2D property surface (heatmap) and return a serializable dict."""
     data = compute_property_surface(model_key, prop_key, T_range, P_range, n_points)
     info = MODEL_REGISTRY[model_key]
 
@@ -256,6 +284,7 @@ def _store_surface_2d(model_key, prop_key, T_range, P_range,
 
 def _store_surface_3d(model_key, prop_key, T_range, P_range,
                       n_points, z_choice, show_phase):
+    """Compute a 3D property surface and return a serializable dict."""
     data = compute_property_surface(model_key, prop_key, T_range, P_range, n_points)
     info = MODEL_REGISTRY[model_key]
 
@@ -282,6 +311,7 @@ def _store_surface_3d(model_key, prop_key, T_range, P_range,
 # =====================================================================
 
 def _render_curves(pe_data, settings):
+    """Build a line-plot figure from stored curve data."""
     palette = get_palette(settings)
     lw = settings.get('line_width', DEFAULTS['line_width'])
 
@@ -315,6 +345,7 @@ def _render_curves(pe_data, settings):
 
 
 def _render_surface_2d(pe_data, settings):
+    """Build a 2D heatmap + contour figure from stored surface data."""
     cmap = settings.get('surface_cmap', DEFAULTS['surface_cmap'])
     z_choice = pe_data['z_choice']
     T_1d = pe_data['T_1d']
@@ -380,6 +411,7 @@ def _render_surface_2d(pe_data, settings):
 
 
 def _render_surface_3d(pe_data, settings):
+    """Build a rotatable 3D surface figure from stored surface data."""
     cmap = settings.get('surface_cmap', DEFAULTS['surface_cmap'])
     z_choice = pe_data['z_choice']
     T_grid = pe_data['T_grid']
@@ -445,6 +477,7 @@ def _render_surface_3d(pe_data, settings):
 # =====================================================================
 
 def _add_phase_traces_2d(fig, phase_traces, settings):
+    """Add spinodal, binodal, and LLCP traces to a 2D figure."""
     if not phase_traces:
         return
     plw = settings.get('phase_line_width', DEFAULTS['phase_line_width'])
@@ -480,6 +513,7 @@ def _add_phase_traces_2d(fig, phase_traces, settings):
 
 
 def _add_phase_traces_3d(fig, phase_traces, z_choice, settings):
+    """Add spinodal, binodal, and LLCP traces to a 3D figure."""
     if not phase_traces:
         return
     plw = settings.get('phase_line_width', DEFAULTS['phase_line_width'])
@@ -533,6 +567,7 @@ def _clip_phase_tp(T_arr, P_arr, T_range, P_range):
             & (P >= P_range[0]) & (P <= P_range[1]))
 
 def _compute_along_curve(model_key, prop_key, T_arr, P_arr):
+    """Evaluate a property along a T(P) curve (scatter mode, diagonal extraction)."""
     from watereos import getProp
     PT = np.array([P_arr, T_arr], dtype=object)
     result = getProp(PT, model_key)
@@ -541,6 +576,7 @@ def _compute_along_curve(model_key, prop_key, T_arr, P_arr):
 
 
 def _extend_to_llcp(T_arr, P_arr, prop_arr, pd_data, model_key, prop_key):
+    """Prepend the LLCP point so phase boundary curves converge at the critical point."""
     if 'LLCP' not in pd_data:
         return T_arr, P_arr, prop_arr
     llcp = pd_data['LLCP']
@@ -555,6 +591,7 @@ def _extend_to_llcp(T_arr, P_arr, prop_arr, pd_data, model_key, prop_key):
 
 def _compute_phase_curves(model_key, prop_key, isobar_mode,
                           T_range=None, P_range=None):
+    """Compute phase boundary curves (spinodal/binodal/LLCP) in property space for 2D plots."""
     try:
         pd_data = compute_phase_diagram_data(model_key)
     except Exception:
@@ -723,6 +760,7 @@ def _serialize_phase_diagram(model_key, T_range=None, P_range=None):
 
 
 def _compute_phase_3d(model_key, prop_key, T_range=None, P_range=None):
+    """Compute phase boundary curves in (T, P, property) space for 3D surface plots."""
     try:
         pd_data = compute_phase_diagram_data(model_key)
     except Exception:

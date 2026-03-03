@@ -7,15 +7,38 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ModelInfo:
+    """Metadata for a single equation-of-state model.
+
+    Attributes
+    ----------
+    display_name : str
+        Human-readable name shown in the UI (e.g. ``'Holten (2014)'``).
+    model_key : str
+        Key passed to ``watereos.getProp(PT, model_key)``.
+    is_two_state : bool
+        Whether the model uses a two-state (HDL/LDL) mixing framework.
+        Two-state models produce per-state outputs (``_A`` / ``_B`` suffixes)
+        and a mixing fraction ``x`` (LDL fraction).
+    has_phase_diagram : bool
+        Whether a liquid--liquid phase diagram can be computed for this model.
+    has_transport : bool
+        Whether the model provides transport properties (``eta``, ``D``, ``tau_r``).
+    T_min, T_max : float
+        Suggested temperature range (K) where results are physically meaningful.
+    P_min, P_max : float
+        Suggested pressure range (MPa).
+    properties : list[str]
+        Output property keys this model supports (e.g. ``['rho', 'V', ...]``).
+    """
     display_name: str
-    model_key: str          # key passed to watereos.getProp(PT, model)
+    model_key: str
     is_two_state: bool
     has_phase_diagram: bool
     has_transport: bool
-    T_min: float            # suggested minimum T (K)
-    T_max: float            # suggested maximum T (K)
-    P_min: float            # suggested minimum P (MPa)
-    P_max: float            # suggested maximum P (MPa)
+    T_min: float
+    T_max: float
+    P_min: float
+    P_max: float
     properties: list = field(default_factory=list)
 
 
