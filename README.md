@@ -123,19 +123,6 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
 - `getProp()` and `compute()` issue a `UserWarning` when inputs fall outside the suggested validity range. Results outside these ranges may be unphysical (e.g., negative compressibility or heat capacity).
 
-## Choosing a Model
-
-| If you need… | Use | Why |
-|--------------|-----|-----|
-| General thermodynamics (250–370 K, moderate pressures) | `duska2020` | Broadest T range, volume-additive mixing, fast Rust backend |
-| Deeply supercooled regime (200–300 K) at positive pressures | `holten2014` or `caupin2019` | Foundational two-state models; Holten is the most widely cited |
-| Negative pressures / stretched water | `caupin2019` | Only model validated to &minus;140 MPa |
-| Viscosity, diffusion, or rotational correlation time | `singh2017` | Only model with transport properties; uses Holten thermodynamics |
-| Empirical correlation without two-state assumptions | `grenke2025` | Tait-Tammann fit; no `x`, `_A`, `_B` outputs |
-| IAPWS-95 reference data or temperatures above 370 K | `IAPWS95` or `water1` | International standard; valid 240–501 K, 0–2300 MPa |
-
-**If unsure, start with `duska2020`.** It covers the widest temperature range and includes both the supercooled anomalies and ambient conditions.
-
 ## Key Concepts
 
 <details>
