@@ -1,0 +1,46 @@
+# Keep Docker build contexts small and reproducible.
+
+# Version control / editor noise
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Node tooling — installed inside stage 1, never in the runtime image.
+**/node_modules
+watereos-web/dist
+
+# Python build artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+build
+dist
+
+# Rust target dir (the Python package falls back to pure-Python if the
+# native module is missing, so we don't need to ship the binary).
+target
+
+# Local virtualenvs
+.venv
+venv
+env
+
+# Render config (we deploy via Railway/Dockerfile)
+render.yaml
+
+# Large data / docs not needed at runtime
+docs
+*.pdf
+*.zip
+
+# Test scaffolding
+tests

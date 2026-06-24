@@ -1,0 +1,241 @@
+"""
+Model registry — single source of truth for waterEoS model metadata.
+"""
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ModelInfo:
+    """Metadata for a single equation-of-state model.
+
+    Attributes
+    ----------
+    display_name : str
+        Human-readable name shown in the UI (e.g. ``'Holten (2014)'``).
+    model_key : str
+        Key passed to ``watereos.getProp(PT, model_key)``.
+    is_two_state : bool
+        Whether the model uses a two-state (HDL/LDL) mixing framework.
+        Two-state models produce per-state outputs (``_A`` / ``_B`` suffixes)
+        and a mixing fraction ``x`` (LDL fraction).
+    has_phase_diagram : bool
+        Whether a liquid--liquid phase diagram can be computed for this model.
+    has_transport : bool
+        Whether the model provides transport properties (``eta``, ``D``, ``tau_r``).
+    T_min, T_max : float
+        Suggested temperature range (K) where results are physically meaningful.
+    P_min, P_max : float
+        Suggested pressure range (MPa).
+    properties : list[str]
+        Output property keys this model supports (e.g. ``['rho', 'V', ...]``).
+    """
+    display_name: str
+    model_key: str
+    is_two_state: bool
+    has_phase_diagram: bool
+    has_transport: bool
+    T_min: float
+    T_max: float
+    P_min: float
+    P_max: float
+    properties: list = field(default_factory=list)
+
+
+# --- Property definitions ---------------------------------------------------
+
+_MIX_KEYS = [
+    'rho', 'V', 'S', 'G', 'H', 'U', 'A', 'Cp', 'Cv',
+    'Kt', 'Ks', 'Kp', 'alpha', 'vel', 'x',
+]
+
+_STATE_KEYS = [
+    'rho', 'V', 'S', 'G', 'H', 'U', 'A', 'Cp', 'Cv',
+    'Kt', 'Ks', 'Kp', 'alpha', 'vel',
+]
+
+_TRANSPORT_KEYS = ['eta', 'D', 'tau_r', 'f']
+
+TWO_STATE_PROPS = _MIX_KEYS + [f'{k}_A' for k in _STATE_KEYS] + [f'{k}_B' for k in _STATE_KEYS]
+EMPIRICAL_PROPS = [k for k in _MIX_KEYS if k != 'x']
+TRANSPORT_PROPS = _TRANSPORT_KEYS + TWO_STATE_PROPS
+
+PROPERTY_LABELS = {
+    'rho': 'Density',
+    'V': 'Specific Volume',
+    'S': 'Entropy',
+    'G': 'Gibbs Energy',
+    'H': 'Enthalpy',
+    'U': 'Internal Energy',
+    'A': 'Helmholtz Energy',
+    'Cp': 'Isobaric Heat Capacity',
+    'Cv': 'Isochoric Heat Capacity',
+    'Kt': 'Isothermal Bulk Modulus',
+    'Ks': 'Adiabatic Bulk Modulus',
+    'Kp': "dKt/dP",
+    'alpha': 'Thermal Expansivity',
+    'vel': 'Speed of Sound',
+    'x': 'LDL Fraction (x)',
+    'eta': 'Dynamic Viscosity',
+    'D': 'Self-Diffusion Coefficient',
+    'tau_r': 'Rotational Correlation Time',
+    'f': 'LDS Fraction (f)',
+}
+
+PROPERTY_UNITS = {
+    'rho': 'kg/m³',
+    'V': 'm³/kg',
+    'S': 'J/(kg·K)',
+    'G': 'J/kg',
+    'H': 'J/kg',
+    'U': 'J/kg',
+    'A': 'J/kg',
+    'Cp': 'J/(kg·K)',
+    'Cv': 'J/(kg·K)',
+    'Kt': 'MPa',
+    'Ks': 'MPa',
+    'Kp': 'dimensionless',
+    'alpha': '1/K',
+    'vel': 'm/s',
+    'x': '',
+    'eta': 'Pa·s',
+    'D': 'm²/s',
+    'tau_r': 's',
+    'f': '',
+}
+
+# Extend labels/units for _A and _B variants
+for k in _STATE_KEYS:
+    for suffix, state_name in [('_A', ' (State A)'), ('_B', ' (State B)')]:
+        key = k + suffix
+        PROPERTY_LABELS[key] = PROPERTY_LABELS[k] + state_name
+        PROPERTY_UNITS[key] = PROPERTY_UNITS[k]
+
+
+# --- Model registry ---------------------------------------------------------
+
+MODEL_REGISTRY = {
+    'water1': ModelInfo(
+        display_name='SeaFreeze water1',
+        model_key='water1',
+        is_two_state=False,
+        has_phase_diagram=False,
+        has_transport=False,
+        T_min=240, T_max=500,
+        P_min=0.1, P_max=2300,
+        properties=EMPIRICAL_PROPS,
+    ),
+    'IAPWS95': ModelInfo(
+        display_name='IAPWS-95',
+        model_key='IAPWS95',
+        is_two_state=False,
+        has_phase_diagram=False,
+        has_transport=False,
+        T_min=240, T_max=500,
+        P_min=0.1, P_max=2300,
+        properties=EMPIRICAL_PROPS,
+    ),
+    'holten2014': ModelInfo(
+        display_name='Holten (2014)',
+        model_key='holten2014',
+        is_two_state=True,
+        has_phase_diagram=True,
+        has_transport=False,
+        T_min=200, T_max=300,
+        P_min=0.0, P_max=400,
+        properties=TWO_STATE_PROPS,
+    ),
+    'caupin2019': ModelInfo(
+        display_name='Caupin (2019)',
+        model_key='caupin2019',
+        is_two_state=True,
+        has_phase_diagram=True,
+        has_transport=False,
+        T_min=200, T_max=300,
+        P_min=-140, P_max=400,
+        properties=TWO_STATE_PROPS,
+    ),
+    'duska2020': ModelInfo(
+        display_name='Duska (2020)',
+        model_key='duska2020',
+        is_two_state=True,
+        has_phase_diagram=True,
+        has_transport=False,
+        T_min=200, T_max=370,
+        # Formulated above the liquid spinodal, so it extends into the
+        # stretched (negative-pressure) regime. Duska (2020) reports
+        # accurate agreement with data to ~100 MPa, degrading gradually at
+        # negative pressure; -150 MPa is a practical lower bound well above
+        # the model's own spinodal at all T >= 200 K.
+        P_min=-150, P_max=400,
+        properties=TWO_STATE_PROPS,
+    ),
+    'caupin2019_kim': ModelInfo(
+        display_name='Caupin (2019, with Kim)',
+        model_key='caupin2019_kim',
+        is_two_state=True,
+        has_phase_diagram=True,
+        has_transport=False,
+        T_min=200, T_max=300,
+        # Same fitted data window as the without-Kim fit (Caupin 2019:
+        # below 300 K, -140 to 400 MPa). LLCP is at 219.47 K / 58.74 MPa.
+        P_min=-140, P_max=400,
+        properties=TWO_STATE_PROPS,
+    ),
+    'grenke2025': ModelInfo(
+        display_name='Grenke (2025)',
+        model_key='grenke2025',
+        is_two_state=False,
+        has_phase_diagram=False,
+        has_transport=False,
+        T_min=200, T_max=300,
+        P_min=0.1, P_max=400,
+        properties=EMPIRICAL_PROPS,
+    ),
+    'singh2017': ModelInfo(
+        display_name='Singh (2017)',
+        model_key='singh2017',
+        is_two_state=True,
+        has_phase_diagram=False,
+        has_transport=True,
+        T_min=200, T_max=300,
+        P_min=0.0, P_max=400,
+        properties=TRANSPORT_PROPS,
+    ),
+}
+
+# Ordered list for consistent UI display
+MODEL_ORDER = [
+    'duska2020', 'holten2014', 'caupin2019', 'caupin2019_kim',
+    'grenke2025', 'singh2017',
+    'water1', 'IAPWS95',
+]
+
+
+def get_common_properties(model_keys):
+    """Return the intersection of properties supported by all given models."""
+    if not model_keys:
+        return []
+    sets = [set(MODEL_REGISTRY[k].properties) for k in model_keys if k in MODEL_REGISTRY]
+    if not sets:
+        return []
+    common = sets[0]
+    for s in sets[1:]:
+        common &= s
+    # Preserve a canonical order
+    all_keys = _MIX_KEYS + [f'{k}_A' for k in _STATE_KEYS] + [f'{k}_B' for k in _STATE_KEYS] + _TRANSPORT_KEYS
+    return [k for k in all_keys if k in common]
+
+
+def get_display_label(prop_key):
+    """Return 'Label (unit)' string for a property key."""
+    label = PROPERTY_LABELS.get(prop_key, prop_key)
+    unit = PROPERTY_UNITS.get(prop_key, '')
+    if unit:
+        return f'{label} [{unit}]'
+    return label
+
+
+def models_with_phase_diagram():
+    """Return list of model keys that support phase diagram computation."""
+    return [k for k in MODEL_ORDER if MODEL_REGISTRY[k].has_phase_diagram]

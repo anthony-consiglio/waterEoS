@@ -1,0 +1,37 @@
+[package]
+name = "watereos_rs"
+version = "0.4.1"
+edition = "2021"
+
+[lib]
+name = "watereos_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py39", "generate-import-lib"] }
+numpy = "0.24"
+rayon = "1.10"
+
+# Release profile tuned for numerical Rust extensions. The defaults are
+# fine for application code but leave 10-25% on the table for tight
+# float kernels like the two-state EoS evaluators.
+#
+#   lto = "fat"        — link-time optimisation across crates and within
+#                        the cdylib, enabling cross-module inlining of
+#                        the per-point compute functions called from the
+#                        batch loops.
+#   codegen-units = 1  — single codegen unit lets LLVM see the whole
+#                        crate when scheduling and vectorising; pays a
+#                        modest compile-time cost.
+#   panic = "abort"    — no unwinding tables; tiny binary-size and
+#                        codegen wins. Acceptable here because every
+#                        PyO3 entrypoint catches errors via Result<>.
+#
+# target-cpu is NOT set: that would pin the wheel to whichever CPU the
+# build machine has, breaking PyPI distribution. Users who self-build
+# can opt in by exporting RUSTFLAGS="-C target-cpu=native" before
+# `cargo build --release`.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

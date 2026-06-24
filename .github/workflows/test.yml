@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        # API tests pull fastapi / plotly / pydantic from the [web] extra;
+        # tv-phase-diagram tests need iapws from [tv]. Both are installed
+        # alongside [dev] so the full backend suite can run in CI.
+        run: pip install ".[dev,web,tv]"
+
+      - name: Run tests
+        run: pytest tests/ -q

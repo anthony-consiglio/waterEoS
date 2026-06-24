@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proposal: An advanced two-state water EoS via crossover + microscopic grounding</title>
+<style>
+  :root {
+    --fg: #1a1a1c;
+    --fg-muted: #555;
+    --bg: #fafafa;
+    --bg-card: #ffffff;
+    --border: #e4e4e7;
+    --border-strong: #cccccf;
+    --accent: #4a5d8e;
+    --accent-soft: #eef1f8;
+    --code-bg: #f3f3f5;
+    --table-stripe: #f7f7f9;
+    --good: #2f6f3e;
+    --warn: #8a5a00;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    padding: 2.5rem 1rem 4rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--bg-card);
+    padding: 3rem 3rem 3.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  h1 {
+    font-size: 1.85rem;
+    line-height: 1.25;
+    margin: 0 0 0.4rem;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.6rem 0 0.7rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--fg);
+  }
+  h3 {
+    font-size: 1.1rem;
+    margin: 1.8rem 0 0.5rem;
+    color: var(--accent);
+  }
+  h4 {
+    font-size: 1rem;
+    margin: 1.2rem 0 0.4rem;
+  }
+  p, li { color: var(--fg); }
+  .meta {
+    color: var(--fg-muted);
+    font-size: 0.9rem;
+    margin: 0 0 2rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .meta strong { color: var(--fg); }
+  .toc {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0 2rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .toc h4 { margin: 0 0 0.4rem; font-size: 0.85rem; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--fg-muted); }
+  .toc ol { margin: 0; padding-left: 1.2rem; }
+  .toc li { margin: 0.2rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  code, pre, .formula {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 0.9rem 1.1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .formula {
+    display: block;
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 0.7rem 1rem;
+    margin: 0.7rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.92rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.4rem;
+    font-size: 0.92rem;
+  }
+  th, td {
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    background: var(--accent-soft);
+    color: var(--fg);
+    border-bottom: 2px solid var(--accent);
+  }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin: 0.3rem 0; }
+  blockquote {
+    border-left: 3px solid var(--border-strong);
+    padding: 0.4rem 1rem;
+    margin: 1rem 0;
+    color: var(--fg-muted);
+    font-style: italic;
+  }
+  .callout {
+    padding: 1rem 1.2rem;
+    border-radius: 4px;
+    margin: 1.2rem 0;
+    border-left: 3px solid;
+  }
+  .callout.recommend {
+    background: #f0f6f1;
+    border-color: var(--good);
+  }
+  .callout.risk {
+    background: #fbf6e8;
+    border-color: var(--warn);
+  }
+  .callout strong { display: block; margin-bottom: 0.25rem;
+                    text-transform: uppercase; font-size: 0.78rem;
+                    letter-spacing: 0.06em; }
+  .callout.recommend strong { color: var(--good); }
+  .callout.risk strong { color: var(--warn); }
+  .diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--fg);
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-size: 0.85rem;
+  }
+  .check  { color: var(--good); font-weight: 600; }
+  @media (max-width: 640px) {
+    main { padding: 1.5rem 1.2rem 2.5rem; }
+    body { padding: 1rem 0.5rem; }
+    h1 { font-size: 1.5rem; }
+    .formula { font-size: 0.82rem; }
+  }
+  @media print {
+    body { background: white; padding: 0; }
+    main { box-shadow: none; border: none; max-width: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Proposal: An advanced two-state water EoS via Ising crossover and microscopic grounding</h1>
+
+<p class="meta">
+  <strong>Context:</strong> Extending the Duška (2020) / Caupin (2019) class of two-state EoSs with two
+  independent advances that compose into a single coherent model.<br>
+  <strong>Status:</strong> Research proposal &mdash; not yet implemented.<br>
+  <strong>Project:</strong> waterEoS &middot; <strong>Author:</strong> Anthony Consiglio
+</p>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#framing">Framing</a></li>
+    <li><a href="#axis1">Axis 1 &mdash; Parametric Ising crossover</a></li>
+    <li><a href="#axis2">Axis 2 &mdash; Microscopic grounding (lattice minimal model)</a></li>
+    <li><a href="#combined">Combining them: the v1 advanced model</a></li>
+    <li><a href="#validation">Validation strategy</a></li>
+    <li><a href="#risks">Genuine research uncertainty</a></li>
+    <li><a href="#recommendation">Honest recommendation</a></li>
+  </ol>
+</div>
+
+<h2 id="framing">1. Framing</h2>
+<p>
+  Both axes are independent in principle but <strong>compose into a single coherent model</strong>.
+  Axis 1 fixes a thermodynamic-rigor problem (mean-field exponents are wrong near the LLCP).
+  Axis 2 fixes an interpretability/transferability problem (polynomial coefficients are not physical).
+  Together they give a model with correct critical scaling, physically meaningful parameters, and far fewer
+  knobs than Caupin (2019) or Duška (2020).
+</p>
+
+<h2 id="axis1">2. Axis 1 &mdash; Parametric Ising crossover</h2>
+
+<h3>The physics</h3>
+<p>Near the LLCP, mean-field theory gives the wrong exponents:</p>
+
+<table>
+  <thead><tr><th>Quantity</th><th>Mean-field</th><th>3D Ising</th></tr></thead>
+  <tbody>
+    <tr><td>&kappa;<sub>T</sub> along the critical isochore</td>
+        <td>&prop; |T&minus;T<sub>c</sub>|<sup>&minus;1</sup></td>
+        <td>&prop; |T&minus;T<sub>c</sub>|<sup>&minus;1.239</sup></td></tr>
+    <tr><td>Order parameter on the binodal</td>
+        <td>&prop; |T&minus;T<sub>c</sub>|<sup>0.5</sup></td>
+        <td>&prop; |T&minus;T<sub>c</sub>|<sup>0.326</sup></td></tr>
+    <tr><td>Critical isotherm</td>
+        <td>h &prop; m<sup>3</sup></td>
+        <td>h &prop; m<sup>4.789</sup></td></tr>
+  </tbody>
+</table>
+
+<p>
+  Caupin, Duška, and Holten are all mean-field and so are systematically wrong in any
+  &sim;10&nbsp;K window around the predicted LLCP. Far from C&prime; the differences are imperceptible
+  (and Caupin's paper explicitly justifies mean-field at the data locations), but a model claiming to
+  be "most advanced" should be correct in both regimes.
+</p>
+
+<p>The standard machinery is the <strong>parametric crossover Landau expansion</strong> developed by
+  Anisimov, Sengers, Kostko, Belyakov, Kiselev and collaborators across the 1990s&ndash;2010s. Two
+  references for water specifically:</p>
+
+<ul>
+  <li><strong>Fuentevilla &amp; Anisimov</strong>, <em>PRL</em> 97, 195702 (2006) &mdash; scaled
+      parametric EoS using the Schofield revised linear model (RLM).</li>
+  <li><strong>Bertrand &amp; Anisimov</strong>, <em>J. Phys. Chem. B</em> 115, 14099 (2011) &mdash;
+      explicit crossover construction for water with <strong>complete scaling</strong> (field mixing
+      of T, P, &mu;).</li>
+</ul>
+
+<h3>The construction in three layers</h3>
+
+<h4>Layer A &mdash; Schofield RLM near C&prime; (parametric Ising)</h4>
+<p>Two variables: <code>r</code> (distance to C&prime;) and <code>&theta;</code> (angular).</p>
+
+<div class="formula">t = r &middot; (1 &minus; b&sup2;&theta;&sup2;)                    # reduced temperature
+m = k &middot; r<sup>&beta;</sup> &middot; &theta;                          # order parameter
+h = a &middot; r<sup>&beta;&middot;&delta;</sup> &middot; &theta; &middot; (1 &minus; &theta;&sup2;)             # ordering field</div>
+
+<p>with &beta; = 0.326, &delta; = 4.789. Property = derivative of a master Gibbs potential
+&Psi;(r, &theta;) that's polynomial in &theta; and analytic in r. This is what you'd evaluate in a small
+neighborhood of C&prime;.</p>
+
+<h4>Layer B &mdash; Field mixing (complete scaling for water)</h4>
+<p>Water's LLCP is a "mixed" transition, so <code>t</code> and <code>h</code> aren't pure T/P &mdash;
+they mix:</p>
+<div class="formula">h = P&#770; + a&#8321;&middot;T&#770; + a&#8322;&middot;T&#770;&sup2; + a&#8323;&middot;P&#770;&middot;T&#770; + &hellip;
+t = T&#770; + b&#8321;&middot;P&#770; + b&#8322;&middot;P&#770;&sup2; + &hellip;</div>
+<p>This is what Bertrand &amp; Anisimov work out &mdash; and it's a real complication, because water's
+LLCP sits in a region where &mu; also matters.</p>
+
+<h4>Layer C &mdash; Crossover function bridging Ising to mean-field</h4>
+<p>Belyakov&ndash;Kiselev (or Tang&ndash;Sengers&ndash;Chen) introduce a crossover variable
+<code>Y &isin; (0, 1]</code>:</p>
+<ul>
+  <li><code>Y &rarr; 1</code> far from C&prime; &rarr; recover mean-field.</li>
+  <li><code>Y &rarr; r<sup>&Delta;</sup></code> near C&prime; &rarr; recover Ising scaling.</li>
+</ul>
+<p>where &Delta; &asymp; 0.51 is the Wegner correction exponent. The Landau coefficients get renormalized by
+powers of Y:</p>
+<div class="formula">&atilde; = a &middot; Y<sup>&minus;&alpha;/&Delta;</sup>,   &utilde; = u &middot; Y<sup>(2&beta;&minus;1)/&Delta;</sup>, &hellip;</div>
+<p>A simple closed-form for Y: solve
+<code>1/Y&sup2; = 1 + (&kappa;/Y)<sup>2/&Delta;</sup> &middot; (1 + r&sup2;/r<sub>max</sub>&sup2;)</code>
+for some Ginzburg number &kappa; and a "max distance" r<sub>max</sub>. The model becomes pure mean-field
+for r &gt;&gt; r<sub>max</sub> and pure Ising for r &lt;&lt; r<sub>max</sub>.</p>
+
+<h3>waterEoS implementation</h3>
+<p>You don't need a full rewrite. The cleanest path is to <strong>leave Duška/Caupin in charge of the
+far-field</strong> and patch the near-LLCP region:</p>
+
+<pre><code>caupin_crossover_eos/                # new module
+├── params.py                        # Ising exponents + crossover constants
+├── core_ising.py                    # Schofield RLM &rarr; G, dG/dT, dG/dP, etc.
+├── core_crossover.py                # crossover-renormalized Landau expansion
+├── core.py                          # decides regime: pure-Caupin / crossover / pure-Ising
+└── phase_diagram.py                 # binodal with correct &beta; = 0.326 exponent</code></pre>
+
+<p>The dispatch in <code>core.py</code>:</p>
+
+<pre><code>def compute_batch(T_K, P_MPa, pset=PARAMS):
+    r = _distance_to_llcp(T_K, P_MPa, pset)
+    Y = _crossover_variable(r, pset)
+    # Always evaluate the crossover-renormalized form;
+    # Y handles regime smoothly.
+    return _properties_from_landau_with_crossover(T_K, P_MPa, Y, pset)</code></pre>
+
+<p>
+  The trick that makes this <em>one</em> function rather than three patched together: the
+  crossover-renormalized Landau expansion is exact in both limits. As Y&rarr;1 you recover Caupin's
+  form; as Y&rarr;0 you recover the Schofield RLM. No piecewise stitching, no derivative jumps.
+</p>
+
+<p>What you'd add per file (rough scale):</p>
+<ul>
+  <li><strong>params:</strong> &sim;15 new constants (5 Ising exponents are universal,
+      &sim;5 field-mixing, &sim;3 crossover, &sim;2 background).</li>
+  <li><strong>core:</strong> &sim;300 lines numpy; &sim;400 lines Rust; both need autodiff or
+      careful manual derivatives because &Psi; is composed of r(t, h), &theta;(t, h) via <em>implicit</em>
+      equations &mdash; JAX is great here.</li>
+</ul>
+
+<p><strong>Effort estimate:</strong> 2&ndash;3 weeks for a working numpy implementation + validation;
++1 week Rust parity; +1 week JAX/AD path for derivatives. Mostly straightforward porting from the
+Bertrand-Anisimov paper, which is fairly explicit. The hardest part is finding the field-mixing
+coefficients (a&#8321;, a&#8322;, b&#8321;, &hellip;) that align Caupin's far-field with the crossover near-field
+&mdash; likely a constrained nonlinear fit against Caupin output + Kim 2020 &kappa;<sub>T</sub> data.</p>
+
+<h2 id="axis2">3. Axis 2 &mdash; Microscopic grounding (lattice minimal model)</h2>
+
+<h3>The physics</h3>
+<p>The 2021 paper (Caupin, Anisimov, and collaborators) &mdash; "Minimal microscopic model for liquid
+polyamorphism" &mdash; is essentially this:</p>
+
+<p>Lattice sites carry one of two species (A = HDL, B = LDL) with site energies and lattice excitations.
+The exact (mean-field) free energy per site is:</p>
+
+<div class="formula">f(x; T, P) = (1 &minus; x)&middot;&mu;<sub>A</sub>&deg;(T, P) + x&middot;&mu;<sub>B</sub>&deg;(T, P)
+           + k<sub>B</sub>T [x ln x + (1 &minus; x) ln(1 &minus; x)]   # ideal mixing
+           &minus; &omega;(T, P) &middot; x (1 &minus; x)                  # interaction (cooperativity)</div>
+
+<p>where &mu;<sub>A</sub>&deg; and &mu;<sub>B</sub>&deg; are the chemical potentials of pure-A and
+pure-B states. For water:</p>
+
+<div class="formula">&mu;<sub>A</sub>&deg;(T, P) = U<sub>A</sub> &minus; T&middot;S<sub>A</sub> + P&middot;V<sub>A</sub> + small thermal terms
+&mu;<sub>B</sub>&deg;(T, P) = U<sub>B</sub> &minus; T&middot;S<sub>B</sub> + P&middot;V<sub>B</sub> + small thermal terms</div>
+
+<p>with <strong>U<sub>B</sub> &minus; U<sub>A</sub> &gt; 0</strong> (LDL is higher-energy per molecule),
+<strong>S<sub>A</sub> &minus; S<sub>B</sub> &gt; 0</strong> (HDL is more disordered),
+<strong>V<sub>B</sub> &minus; V<sub>A</sub> &gt; 0</strong> (LDL is less dense). The cooperativity &omega;
+encodes hydrogen-bond network strength.</p>
+
+<p>This is <strong>the same algebraic skeleton as Holten/Caupin</strong> &mdash; <code>&Delta;G<sup>BA</sup></code>
+and <code>&omega;(1&minus;2x)</code> show up identically &mdash; but the <em>meaning</em> changes:</p>
+
+<ul>
+  <li>Where Caupin writes <code>&Delta;G<sup>BA</sup> = &lambda;(&Delta;T&#770; + a&middot;&Delta;P&#770; + b&middot;&Delta;T&#770;&middot;&Delta;P&#770; + d&middot;&Delta;P&#770;&sup2; + f&middot;&Delta;T&#770;&sup2;)</code>
+      as a pure polynomial fit, the microscopic model writes
+      <code>&mu;<sub>B</sub>&deg; &minus; &mu;<sub>A</sub>&deg; = &Delta;U &minus; T&middot;&Delta;S + P&middot;&Delta;V + &hellip;</code>
+      with each coefficient being a <em>physical quantity</em>.</li>
+  <li>Where Caupin writes <code>&omega;&#770; = (2 + &omega;&#8320;&middot;&Delta;P&#770;)/T&#770;</code> empirically, the
+      microscopic model derives &omega; from lattice bond statistics.</li>
+  <li>The LLCP location is <em>predicted</em> from these microscopic parameters
+      (set <code>&part;f/&part;x = &part;&sup2;f/&part;x&sup2; = &part;&sup3;f/&part;x&sup3; = 0</code> &mdash; three equations
+      in T<sub>c</sub>, P<sub>c</sub>, x<sub>c</sub>).</li>
+</ul>
+
+<h3>Why this matters beyond aesthetics</h3>
+
+<ol>
+  <li><strong>Parameter parsimony.</strong> Holten has 25 background coefficients; Duška has 28;
+      Caupin has &sim;21. A pure microscopic model has &sim;5&ndash;6 physical parameters
+      (&Delta;U, &Delta;S, &Delta;V, &omega;&#8320;, plus 1&ndash;2 thermal-expansion terms per state).
+      That's a 4&times; reduction in parameter count.</li>
+  <li><strong>Transferability.</strong> Calibrated parameters can be tested against TIP4P/2005
+      simulations (where you can <em>measure</em> &Delta;U, &Delta;S, &Delta;V cluster-by-cluster),
+      giving an independent check.</li>
+  <li><strong>Extensibility to mixtures.</strong> Adding a solute (glycerol, DMSO) is much easier in a
+      lattice model &mdash; you add a third species with its own interactions &mdash; than in a fit
+      polynomial. <strong>This is directly relevant to the cryoprotectant work.</strong></li>
+  <li><strong>The natural substrate for the glass extension.</strong> A lattice model with explicit
+      configurational entropy and free volume is exactly what you need to bolt on a fictive-temperature
+      freezing layer for LDA/HDA.</li>
+</ol>
+
+<h3>waterEoS implementation</h3>
+<p>This is actually <strong>simpler</strong> than the crossover work, because the form is so close to
+what's already there:</p>
+
+<pre><code>microlat_eos/                        # new module
+├── params.py                        # ~6 microscopic params (&Delta;U, &Delta;S, &Delta;V, &omega;&#8320;, &alpha;A, &alpha;B)
+├── core.py                          # G(T, P, x) from lattice free energy
+│                                    # mostly cribbed from caupin_eos/core.py
+├── phase_diagram.py                 # LLCP from derivative conditions on f
+└── README.md</code></pre>
+
+<p>The <code>compute_batch</code> function structure is <strong>identical to Caupin's</strong> &mdash;
+same Newton solve for x, same property derivations from G derivatives. Only the form of
+<code>&Delta;G<sup>BA</sup>(T, P)</code> and <code>&omega;(T, P)</code> change, and both become
+<em>simpler</em>:</p>
+
+<pre><code>def compute_GBA(dT_hat, dP_hat, pset):
+    # Replace Caupin's 5-term polynomial with the physical form:
+    P = pset
+    return (P.delta_U / (P.R * P.Tc)) \
+         - (1.0 + dT_hat) * (P.delta_S / P.R) \
+         + (P.Pc + dP_hat * P.P_scale_MPa) * 1e6 * P.delta_V \
+             / (P.R * P.Tc) \
+         + small_thermal_terms(dT_hat, dP_hat, pset)</code></pre>
+
+<p><strong>Effort estimate:</strong> &sim;1 week for numpy + tests + phase diagram;
++2&ndash;3 days Rust parity. Calibration (fitting the &sim;6 microscopic params against IAPWS-95 +
+Holten/Caupin + Kim 2020 data) is probably the time-consuming part &mdash; call it another week.</p>
+
+<div class="callout risk">
+  <strong>Risk &mdash; tighter fit</strong>
+  The microscopic model may not fit the data as tightly as the 20-term polynomials. Caupin's overall
+  &chi;&sup2; = 0.97 with 21 free parameters reflects a model that's fully expressive enough to fit
+  measurement noise. A 6-parameter microscopic model may have &chi;&sup2; &sim;2&ndash;3. Whether
+  that's a <em>problem</em> depends on what you value &mdash; physical interpretability and
+  transferability, or last-decimal data fit.
+</div>
+
+<h2 id="combined">4. Combining them: the v1 advanced model</h2>
+
+<p>The natural composition:</p>
+
+<div class="diagram">              ┌────────────────────────────────────┐
+              │  Microscopic lattice free energy   │
+              │  f(x, T, P; ΔU, ΔS, ΔV, ω₀)        │
+              │  ~6 physical parameters             │
+              └─────────────┬──────────────────────┘
+                            │
+                ┌───────────┴───────────┐
+                │   Far from LLCP       │      Near LLCP
+                │   (Y → 1)             │      (Y → 0)
+                │   Direct evaluation   │      Schofield RLM
+                └───────────┬───────────┘   with field mixing
+                            │                       │
+                            └────── crossover ──────┘
+                                  K(r/r_max, κ)
+                                       │
+                                       ▼
+                             G(T, P), V, S, Cp, κ_T, …
+                                  + autodiff
+                                       │
+                                       ▼
+                              ✓ IAPWS-95 at 300 K
+                              ✓ Kim 2020 κ_T peak with γ = 1.24
+                              ✓ Predicted LLCP w/ Ising exponents
+                              ✓ Mixtures by adding a 3rd species</div>
+
+<h3>Pragmatic build order</h3>
+
+<ol>
+  <li><strong>Microscopic-only v0</strong> (no crossover yet, still mean-field) &mdash; gets you a
+      6-parameter physically-grounded EoS. Useful immediately as <code>microlat2026</code> in
+      waterEoS.</li>
+  <li><strong>Add crossover</strong> &mdash; patch on the Schofield RLM near C&prime; with the
+      Belyakov-Kiselev variable. Now you have correct Ising exponents AND microscopic grounding.</li>
+  <li><strong>Validate against Kim 2020.</strong> The moment of truth &mdash; does the model
+      reproduce the experimental &kappa;<sub>T</sub> peak shape with &gamma; &asymp; 1.24
+      <em>without retuning</em>, or do you need to add a free background polynomial to mop up?</li>
+</ol>
+
+<h2 id="validation">5. Validation strategy</h2>
+
+<p>Build the test suite around four benchmarks:</p>
+
+<table>
+  <thead>
+    <tr><th>Benchmark</th><th>Tests what</th><th>Pass criterion</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IAPWS-95 over 280&ndash;360&nbsp;K, 0.1&ndash;400&nbsp;MPa</td>
+      <td>Far-field correctness</td>
+      <td>&rho; within 0.1%, &kappa;<sub>T</sub> within 1%</td>
+    </tr>
+    <tr>
+      <td>Holten / Caupin in 220&ndash;280&nbsp;K</td>
+      <td>Supercooled regime fit</td>
+      <td>C<sub>p</sub> peak location within 1&nbsp;K, height within 10%</td>
+    </tr>
+    <tr>
+      <td>Kim 2020 &kappa;<sub>T</sub>(T) at svp</td>
+      <td>Near-LLCP exponents</td>
+      <td>&kappa;<sub>T</sub>(T) &prop; |T&minus;T<sub>W</sub>|<sup>&minus;&gamma;</sup>
+          with &gamma; &isin; [1.15, 1.30]</td>
+    </tr>
+    <tr>
+      <td>TIP4P/2005 cluster statistics</td>
+      <td>Microscopic parameters</td>
+      <td>&Delta;U, &Delta;S, &Delta;V match simulation within error bars</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  The last one is the killer test &mdash; if a fitted &Delta;U disagrees with TIP4P/2005 by 50%, the
+  "microscopic grounding" is illusory. Worth knowing.
+</p>
+
+<h2 id="risks">6. Genuine research uncertainty</h2>
+
+<ul>
+  <li><strong>Field mixing for water is contested.</strong> Bertrand-Anisimov mix T, P, <em>and</em>
+      &mu;. Other groups (Holten, Caupin) just mix T and P. This affects the Ising prefactors but not
+      the exponents. Probably needs to be a fitted choice.</li>
+  <li><strong>The Ginzburg number &kappa; for water's LLCP is unknown</strong> because the LLCP itself
+      is hypothetical. Treat it as a fit parameter, with the understanding that current data only
+      constrain it weakly.</li>
+  <li><strong>Whether two states is <em>enough</em>.</strong> If VHDA is genuinely a third state (vs an
+      HDA polymorph), the entire family of two-state models &mdash; including this proposed advanced
+      one &mdash; has a ceiling.</li>
+</ul>
+
+<h2 id="recommendation">7. Honest recommendation</h2>
+
+<div class="callout recommend">
+  <strong>Publishable model concept</strong>
+  The microscopic + crossover combination is the right target, and as far as the literature search
+  suggests, nobody has assembled both halves into a single fitted water EoS yet. The pieces have been
+  demonstrated in isolation (Bertrand-Anisimov 2011 has crossover; Caupin-Anisimov 2021 has
+  microscopic; nobody has fused them with a Duška-class broad-range fit).
+</div>
+
+<div class="callout recommend">
+  <strong>Something to ship in waterEoS soon</strong>
+  Do the microscopic-only v0 first. It's a real, well-defined, &sim;2-week project with a clear
+  payoff (6 vs 21 parameters, physical interpretability, and the foundation for the cryoprotectant
+  and glass extensions you eventually want). Crossover can come as a v0.2.
+</div>
+
+<hr>
+
+<h3>Key references</h3>
+
+<ul>
+  <li>Fuentevilla, D. A. &amp; Anisimov, M. A.
+      "Scaled equation of state for supercooled water near the liquid-liquid critical point."
+      <em>Phys. Rev. Lett.</em> <strong>97</strong>, 195702 (2006).</li>
+  <li>Bertrand, C. E. &amp; Anisimov, M. A.
+      "Peculiar thermodynamics of the second critical point in supercooled water."
+      <em>J. Phys. Chem. B</em> <strong>115</strong>, 14099 (2011).</li>
+  <li>Caupin, F. &amp; Anisimov, M. A.
+      "Minimal microscopic model for liquid polyamorphism and water-like anomalies"
+      (arXiv:2104.08117, 2021).</li>
+  <li>Caupin, F. &amp; Anisimov, M. A.
+      "Thermodynamics of supercooled and stretched water: unifying two-structure description and
+      liquid-vapor spinodal." <em>J. Chem. Phys.</em> <strong>151</strong>, 034503 (2019).</li>
+  <li>Holten, V., Sengers, J. V. &amp; Anisimov, M. A.
+      "Equation of state for supercooled water at pressures up to 400 MPa."
+      <em>J. Phys. Chem. Ref. Data</em> <strong>43</strong>, 014101 (2014).</li>
+  <li>Duška, M. "Two-state equation of state of water above the spinodal."
+      <em>J. Chem. Phys.</em> <strong>152</strong>, 174501 (2020).</li>
+  <li>Kim, K. H. <em>et al.</em> "Experimental observation of the liquid-liquid transition in bulk
+      supercooled water under pressure." <em>Science</em> <strong>370</strong>, 978 (2020).</li>
+  <li>Belyakov, M. Yu. &amp; Kiselev, S. B. "Crossover behavior of the susceptibility and the specific
+      heat near a second-order phase transition." <em>Physica A</em> <strong>190</strong>, 75 (1992).</li>
+</ul>
+
+<footer>
+  Generated for archival reference. The model proposed here is not implemented; this document records
+  the design as of the date it was written so that the implementation path can be picked up later.
+</footer>
+
+</main>
+</body>
+</html>
