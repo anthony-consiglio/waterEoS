@@ -1,10 +1,10 @@
 """
 Shared phase diagram functions for two-state EoS models.
 
-All three models (Caupin, Holten, Duška) have identical logic for
-spinodal, binodal, phase diagram, TMD, and Kauzmann computations.
-The only model-specific parts are _get_adapter() and find_LLCP(),
-which remain in each model's phase_diagram.py.
+All thermo two-state models (Caupin, Holten, Duška, Shi & Tanaka) share
+the same logic for spinodal, binodal, phase diagram, TMD, and Kauzmann
+computations. The only model-specific parts are _get_adapter() and
+find_LLCP(), which remain in each model's phase_diagram.py.
 """
 
 import numpy as np

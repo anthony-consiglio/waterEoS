@@ -1,9 +1,9 @@
 """
 Shared SeaFreeze-compatible getProp implementation for two-state EoS models.
 
-All three models (Caupin, Holten, Duška) use identical getProp logic:
-grid/scatter input detection, compute_batch dispatch, output assembly.
-Each model's *_eos.py becomes a thin wrapper that supplies its own
+All two-state models (Caupin, Holten, Duška, Shi & Tanaka) use identical
+getProp logic: grid/scatter input detection, compute_batch dispatch, output
+assembly. Each model's *_eos.py becomes a thin wrapper that supplies its own
 compute_batch callable.
 """
 

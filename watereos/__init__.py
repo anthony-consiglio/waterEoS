@@ -1,9 +1,11 @@
 """
 waterEoS — thermodynamic properties of supercooled water.
 
-Provides a unified interface to five equation-of-state models for
-liquid water, including three two-state models that predict a
-liquid--liquid critical point (LLCP) in the deeply supercooled regime.
+Provides a unified interface to ten equation-of-state and transport
+models for liquid water, including four primary two-state thermodynamic
+EoS authors (Holten 2014, Caupin 2019 with optional Kim variant,
+Duska 2020, Shi & Tanaka 2020) that predict a liquid--liquid critical
+point (LLCP) in the deeply supercooled regime.
 
 Quick start
 -----------
@@ -34,10 +36,6 @@ which backend (Rust/JAX/numpy) is dispatching each two-state model.
 from .watereos import getProp, list_models, compute
 from .tv_phase_diagram import compute_tv_phase_diagram, compute_isochore
 from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo
-from .solution_eos import (
-    compute_isochoric_trajectory, compute_liquidus, water_activity,
-    SOLUTE_REGISTRY, IsochoricTrajectory, LiquidusCurve,
-)
 
 # One-time warning if the Rust backend failed to import. Without Rust the
 # two-state models silently fall back to JAX (if installed) or pure-Python
@@ -114,6 +112,4 @@ def backend(model=None):
 
 __all__ = ['getProp', 'compute', 'list_models', 'compute_tv_phase_diagram',
            'compute_isochore', 'MODEL_REGISTRY', 'MODEL_ORDER', 'ModelInfo',
-           'compute_isochoric_trajectory', 'compute_liquidus', 'water_activity',
-           'SOLUTE_REGISTRY', 'IsochoricTrajectory', 'LiquidusCurve',
            'backend']

@@ -3,15 +3,16 @@ Unified water equation-of-state dispatcher.
 
 Provides a single ``getProp(PT, model)`` interface that dispatches to:
 
-  - ``'water1'``      -- SeaFreeze water1
-  - ``'IAPWS95'``     -- SeaFreeze IAPWS-95
-  - ``'holten2014'``  -- Holten, Sengers & Anisimov (2014)
-  - ``'caupin2019'``  -- Caupin & Anisimov (2019)
-  - ``'duska2020'``   -- Duska (2020) EOS-VaT
-  - ``'grenke2025'``  -- Grenke & Elliott (2025) Tait-Tammann
-  - ``'singh2017'``   -- Singh, Issenmann & Caupin (2017) transport
+  - ``'water1'``         -- SeaFreeze water1
+  - ``'IAPWS95'``        -- SeaFreeze IAPWS-95
+  - ``'holten2014'``     -- Holten, Sengers & Anisimov (2014)
+  - ``'caupin2019'``     -- Caupin & Anisimov (2019)
+  - ``'caupin2019_kim'`` -- Caupin & Anisimov (2019), with-Kim variant
+  - ``'duska2020'``      -- Duska (2020) EOS-VaT
   - ``'shi_tanaka2020'``           -- Shi & Tanaka (2020) hierarchical two-state
   - ``'shi_tanaka2020_transport'`` -- same, with viscosity / D / tau_R
+  - ``'grenke2025'``     -- Grenke & Elliott (2025) Tait-Tammann
+  - ``'singh2017'``      -- Singh, Issenmann & Caupin (2017) transport
 """
 
 import warnings
@@ -126,8 +127,10 @@ def getProp(PT, model):
             PT = np.array([(P1, T1), (P2, T2), ...], dtype=object)
 
     model : str
-        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020',
-        'grenke2025', 'singh2017'.  Matching is case-insensitive.
+        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
+        'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
+        'shi_tanaka2020_transport', 'grenke2025', 'singh2017'.
+        Matching is case-insensitive.
 
     Returns
     -------
@@ -199,8 +202,10 @@ def compute(T_K, P_MPa, model):
     P_MPa : float or array_like
         Pressure(s) in MPa.
     model : str
-        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019', 'duska2020',
-        'grenke2025', 'singh2017'.  Matching is case-insensitive.
+        One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
+        'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
+        'shi_tanaka2020_transport', 'grenke2025', 'singh2017'.
+        Matching is case-insensitive.
 
     Returns
     -------

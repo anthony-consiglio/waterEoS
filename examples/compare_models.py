@@ -1,5 +1,5 @@
 """
-Compare density predictions from all five models at ambient conditions.
+Compare density predictions from all available models at ambient conditions.
 """
 import numpy as np
 from watereos import getProp, list_models

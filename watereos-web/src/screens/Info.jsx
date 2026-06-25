@@ -178,14 +178,14 @@ export default function Info({ setTab }) {
         <div className="info-hero-text">
           <span className="tag tag-accent info-hero-badge">
             <span className="info-hero-dot" />
-            Open source · v{metadata?.version ?? '0.4.0'}
+            Open source · v{metadata?.version ?? '0.5.1'}
           </span>
           <h1>
             Thermodynamic equations of state for{' '}
             <span className="info-hero-em">supercooled</span> water.
           </h1>
           <p>
-            A unified toolkit for {metadata?.models?.length ?? 8} equation-of-state models — explore properties, phase diagrams,
+            A unified toolkit for {metadata?.models?.length ?? 10} equation-of-state models — explore properties, phase diagrams,
             and the liquid-liquid phase separation through interactive visualizations.
           </p>
           <div className="info-hero-actions">
@@ -332,7 +332,7 @@ export default function Info({ setTab }) {
           <div>
             <div className="info-credits-label">Package</div>
             <div>
-              waterEoS v{metadata?.version ?? '0.4.0'} ·{' '}
+              waterEoS v{metadata?.version ?? '0.5.1'} ·{' '}
               <a
                 href="https://pypi.org/project/waterEoS/"
                 target="_blank"

@@ -10,22 +10,24 @@
 
 ## Overview
 
-**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It implements five supercooled-water equation-of-state models &mdash; Holten (2014), Caupin (2019), Duška (2020), Grenke (2025), and Singh (2017) &mdash; and provides pass-through access to SeaFreeze `water1` and IAPWS-95, all under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API.
+**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It implements six supercooled-water equation-of-state models &mdash; Holten (2014), Caupin (2019), Duška (2020), Shi & Tanaka (2020), Grenke (2025), and Singh (2017) &mdash; and provides pass-through access to SeaFreeze `water1` and IAPWS-95, all under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API.
 
 ### Two-state equations of state
 
-Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich). waterEoS implements three such models:
+Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich). waterEoS implements four such models:
 
 - **Holten, Sengers & Anisimov (2014)** -- The foundational two-state EOS for supercooled water. Uses a Gibbs-energy (pressure-additive) mixing rule, fitted to experimental data at positive pressures up to 400 MPa. Places the LLCP at 228 K, 0 MPa.
-- **Caupin & Anisimov (2019)** -- Extends the two-state framework to negative pressures (stretched water), connecting the liquid-liquid spinodal to the liquid-vapor spinodal in a unified description. Places the LLCP at 218 K, 72 MPa.
+- **Caupin & Anisimov (2019)** -- Extends the two-state framework to negative pressures (stretched water), connecting the liquid-liquid spinodal to the liquid-vapor spinodal in a unified description. Places the LLCP at 218 K, 72 MPa. An optional `caupin2019_kim` variant uses the with-Kim parameter set from Table II of the same paper, which incorporates the Kim et al. (2017) X-ray scattering data and places the LLCP at 219 K, 59 MPa.
 - **Duska (2020)** -- Uses a volume-additive mixing rule (rather than Gibbs-energy mixing), yielding an explicit equation of state in volume and temperature ("EOS-VaT"). Fitted over a broader temperature range up to 370 K. Places the LLCP at 221 K, 54 MPa.
+- **Shi & Tanaka (2020)** -- A hierarchical two-state EOS in which the order parameter is built from a coarse-grained "locally favored structure" fraction. Reproduces the IAPWS-95 liquid surface to ~0.05% in density and places the LLCP well below experimentally accessible temperatures, at 184 K, 173 MPa, so that the observed anomalies are attributed to the two-state feature itself rather than proximity to the critical point.
 
-All three return 43 thermodynamic properties: 15 mixture properties, 14 per state (A and B), plus the tetrahedral fraction *x*.
+All four return 43 thermodynamic properties: 15 mixture properties, 14 per state (A and B), plus the tetrahedral fraction *x*.
 
 ### Additional models
 
 - **Grenke & Elliott (2025)** -- An empirical Tait-Tammann correlation for supercooled water (not a two-state model). Returns standard thermodynamic properties without per-state decomposition.
 - **Singh, Issenmann & Caupin (2017)** -- A two-state transport model that predicts viscosity, self-diffusion coefficient, and rotational correlation time. Uses Holten (2014) as its thermodynamic backbone.
+- **Shi & Tanaka (2020) transport** -- A companion transport model (`shi_tanaka2020_transport`) for viscosity, self-diffusion, and rotational relaxation, coupled to the same hierarchical two-state framework as `shi_tanaka2020` rather than to Holten. Returns all `shi_tanaka2020` thermodynamic outputs plus `eta`, `D`, and `tau_r`.
 - **SeaFreeze `water1`** -- A pass-through to SeaFreeze's GLBF tensor-product B-spline representation of liquid water (Journaux et al., 2020). Valid 240&ndash;501 K, 0&ndash;2300 MPa.
 - **IAPWS-95** -- A pass-through to the IAPWS-95 reference equation of state for ordinary water (Wagner & Pruß, 2002), accessed via the same SeaFreeze GLBF spline machinery. Provides the canonical reference values that the supercooled-water models above are aligned to.
 
@@ -37,7 +39,7 @@ The web app includes a Property Explorer, an EoS phase diagram viewer (per model
 
 <p align="center">
   <img src="docs/info_hero.png" alt="waterEoS web app" width="700"><br>
-  <em>The waterEoS web app — a unified toolkit for eight equation-of-state models.</em>
+  <em>The waterEoS web app — a unified toolkit for ten equation-of-state models.</em>
 </p>
 
 <p align="center">
@@ -156,8 +158,9 @@ outputs are the equilibrium mixture.
 The predicted critical point at the top of the liquid–liquid coexistence
 dome, analogous to the vapor–liquid critical point but between HDL and
 LDL phases. Each two-state model places it at a different (T, P): Holten
-at (228 K, 0 MPa), Caupin at (218 K, 72 MPa), Duska at (221 K, 54 MPa).
-The LLCP has not yet been directly observed experimentally.
+at (228 K, 0 MPa), Caupin at (218 K, 72 MPa), Duska at (221 K, 54 MPa),
+and Shi & Tanaka at (184 K, 173 MPa). The LLCP has not yet been directly
+observed experimentally.
 </details>
 
 <details>
@@ -452,7 +455,7 @@ BibTeX entry for the software package:
   title        = {{waterEoS}: Thermodynamic equations of state for supercooled water},
   year         = {2026},
   url          = {https://github.com/anthony-consiglio/waterEoS},
-  version      = {0.5.0},
+  version      = {0.5.1},
   license      = {GPL-3.0-only},
 }
 ```
