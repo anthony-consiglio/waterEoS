@@ -23,8 +23,8 @@ Or ``getProp()`` for SeaFreeze-compatible grid/scatter input::
     out = getProp(PT, 'holten2014')   # returns grid of shape (3, 3)
 
 Available models: ``'holten2014'``, ``'caupin2019'``, ``'caupin2019_kim'``,
-``'duska2020'``, ``'grenke2025'``, ``'singh2017'``, ``'water1'``,
-``'IAPWS95'``.
+``'duska2020'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
+``'grenke2025'``, ``'singh2017'``, ``'water1'``, ``'IAPWS95'``.
 
 See ``watereos.model_registry.MODEL_REGISTRY`` for metadata on each model,
 or call ``list_models()`` for a quick summary. Call ``backend()`` to see
@@ -34,6 +34,10 @@ which backend (Rust/JAX/numpy) is dispatching each two-state model.
 from .watereos import getProp, list_models, compute
 from .tv_phase_diagram import compute_tv_phase_diagram, compute_isochore
 from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo
+from .solution_eos import (
+    compute_isochoric_trajectory, compute_liquidus, water_activity,
+    SOLUTE_REGISTRY, IsochoricTrajectory, LiquidusCurve,
+)
 
 # One-time warning if the Rust backend failed to import. Without Rust the
 # two-state models silently fall back to JAX (if installed) or pure-Python
@@ -80,7 +84,8 @@ def backend(model=None):
     for mkey, modname in [('caupin2019', 'caupin_eos.caupin_eos'),
                           ('caupin2019_kim', 'caupin_eos.caupin_kim_eos'),
                           ('holten2014', 'holten_eos.holten_eos'),
-                          ('duska2020', 'duska_eos.duska_eos')]:
+                          ('duska2020', 'duska_eos.duska_eos'),
+                          ('shi_tanaka2020', 'shi_tanaka_eos.shi_tanaka_eos')]:
         try:
             mod = importlib.import_module(modname)
             cb = getattr(mod, 'compute_batch', None)
@@ -94,6 +99,10 @@ def backend(model=None):
                 result[mkey] = 'jax'
             elif 'core' in origin:
                 result[mkey] = 'numpy'
+            elif modname == 'caupin_eos.caupin_kim_eos' and origin == modname:
+                # caupin_kim's fallback wrapper just rebinds params on top of
+                # the numpy core, so the module name attribution is itself.
+                result[mkey] = 'numpy'
             else:
                 result[mkey] = 'unknown'
         except Exception as exc:
@@ -105,4 +114,6 @@ def backend(model=None):
 
 __all__ = ['getProp', 'compute', 'list_models', 'compute_tv_phase_diagram',
            'compute_isochore', 'MODEL_REGISTRY', 'MODEL_ORDER', 'ModelInfo',
+           'compute_isochoric_trajectory', 'compute_liquidus', 'water_activity',
+           'SOLUTE_REGISTRY', 'IsochoricTrajectory', 'LiquidusCurve',
            'backend']

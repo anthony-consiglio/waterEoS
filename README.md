@@ -100,6 +100,8 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'caupin2019_kim'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019), Table II (with-Kim variant); Kim et al., Science **358**, 1589 (2017) | 219.47 K, 58.74 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
+| `'shi_tanaka2020'` | Shi & Tanaka, PNAS **117**, 26591 (2020) | 184 K, 173 MPa |
+| `'shi_tanaka2020_transport'` | Shi & Tanaka, PNAS **117**, 26591 (2020), Tables S2/S3 (transport) | 184 K, 173 MPa |
 | `'grenke2025'` | Grenke & Elliott, J. Phys. Chem. B **129**, 1997 (2025) | -- (empirical) |
 | `'singh2017'` | Singh, Issenmann & Caupin, PNAS **114**, 4312 (2017) | -- (transport) |
 | `'water1'` | SeaFreeze water1 (pass-through) | -- |
@@ -115,6 +117,8 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'caupin2019'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'caupin2019_kim'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'duska2020'` | ~200&ndash;370 K, ~-150 to 400 MPa (paper-validated 0&ndash;100 MPa; degrades at negative P) | Unbounded (any T, P) |
+| `'shi_tanaka2020'` | ~180&ndash;320 K, -110 to 200 MPa (paper-validated; agrees with IAPWS-95 to ~0.05% in ρ and a few % in κ_T, α, Cp across the liquid range) | Unbounded (any T, P) |
+| `'shi_tanaka2020_transport'` | ~180&ndash;320 K, -110 to 200 MPa (η, D, τ_R coupled to the same hierarchical two-state framework) | Unbounded (any T, P) |
 | `'grenke2025'` | 200&ndash;300 K, 0.1&ndash;400 MPa | Unbounded (any T, P) |
 | `'water1'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 | `'singh2017'` | 244&ndash;298 K (limited by homogeneous ice nucleation) | Unbounded (any T, P) |
@@ -126,6 +130,8 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 - Caupin (2019) is the only model explicitly validated at negative pressures (stretched water).
 - Grenke (2025) is a direct empirical Tait-Tammann correlation, not a two-state model. It has no `x`, `_A`, or `_B` outputs.
 - Singh (2017) is a transport properties model that uses Holten (2014) as its thermodynamic backbone. It returns all Holten thermodynamic properties plus `eta`, `D`, and `tau_r`. Its validity range matches Holten (2014).
+- Shi & Tanaka (2020) is the only two-state model in waterEoS that places the LLCP well below experimentally accessible temperatures (184 K vs ~220 K for Holten/Caupin/Duska); the paper argues that the LLCP has negligible impact on observed anomalies in the liquid regime, which are instead driven by the two-state feature itself.
+- `shi_tanaka2020_transport` uses the same hierarchical two-state framework as `shi_tanaka2020` for its dynamic order parameter, so its transport predictions (viscosity, self-diffusion, rotational relaxation) are internally consistent with its own thermodynamics — distinct from `singh2017`, which couples Singh's Arrhenius law to a Holten (2014) thermo backbone.
 - `getProp()` and `compute()` issue a `UserWarning` when inputs fall outside the suggested validity range. Results outside these ranges may be unphysical (e.g., negative compressibility or heat capacity).
 
 ## Key Concepts
@@ -251,7 +257,8 @@ from singh_viscosity import getProp
 ```python
 from watereos import list_models
 print(list_models())
-# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'grenke2025', 'singh2017']
+# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
+#  'grenke2025', 'singh2017', 'shi_tanaka2020', 'shi_tanaka2020_transport']
 ```
 
 ## Output Properties
@@ -386,7 +393,8 @@ and State B (LDL, low-density liquid). Properties like `rho_A` and
 `rho_B` are the densities of the individual states at that (T, P);
 `rho` (no suffix) is the equilibrium mixture density. The mixing
 fraction `x` gives the fraction of LDL (State B). Only two-state
-models (`holten2014`, `caupin2019`, `duska2020`, `singh2017`) provide
+models (`holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`,
+`shi_tanaka2020`, `shi_tanaka2020_transport`, `singh2017`) provide
 these outputs; `grenke2025`, `water1`, and `IAPWS95` do not.
 </details>
 
@@ -415,16 +423,18 @@ fallback is used. Results are identical; only speed differs.
 
 3. M. Duska, "Water above the spinodal," *J. Chem. Phys.* **152**, 174501 (2020). [doi:10.1063/5.0006431](https://doi.org/10.1063/5.0006431)
 
-4. J. C. Grenke and J. R. Elliott, "Empirical fundamental equation of state for the metastable state of water based on the Tait-Tammann equation," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c06847](https://doi.org/10.1021/acs.jpcb.4c06847)
+4. R. Shi and H. Tanaka, "The anomalies and criticality of liquid water," *Proc. Natl. Acad. Sci. U.S.A.* **117**, 26591-26599 (2020). [doi:10.1073/pnas.2008426117](https://doi.org/10.1073/pnas.2008426117) -- Source of both `shi_tanaka2020` (thermodynamic EoS, Table S2 of the SI) and `shi_tanaka2020_transport` (viscosity / self-diffusion / rotational relaxation, Table S3 of the SI).
+
+5. J. C. Grenke and J. R. Elliott, "Empirical fundamental equation of state for the metastable state of water based on the Tait-Tammann equation," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c06847](https://doi.org/10.1021/acs.jpcb.4c06847)
    - Correction: *J. Phys. Chem. B* **129**, 9850-9853 (2025). [doi:10.1021/acs.jpcb.5c04618](https://doi.org/10.1021/acs.jpcb.5c04618)
 
-5. L. P. Singh, B. Issenmann, and F. Caupin, "Pressure dependence of viscosity in supercooled water and a unified approach for thermodynamic and dynamic anomalies of water," *Proc. Natl. Acad. Sci. U.S.A.* **114**, 4312-4317 (2017). [doi:10.1073/pnas.1619501114](https://doi.org/10.1073/pnas.1619501114)
+6. L. P. Singh, B. Issenmann, and F. Caupin, "Pressure dependence of viscosity in supercooled water and a unified approach for thermodynamic and dynamic anomalies of water," *Proc. Natl. Acad. Sci. U.S.A.* **114**, 4312-4317 (2017). [doi:10.1073/pnas.1619501114](https://doi.org/10.1073/pnas.1619501114)
 
-6. B. Journaux, J. M. Brown, A. Pacheco, S. D. Vance, A. Cochrane, T. Bollengier, et al., "Holistic approach for studying planetary hydrospheres: Gibbs representations, ices thermodynamics, transport, and the example of Europa," *J. Geophys. Res.: Planets* **125**, e2019JE006176 (2020). [doi:10.1029/2019JE006176](https://doi.org/10.1029/2019JE006176) -- Source of the SeaFreeze GLBF tensor-product B-spline coefficients used for `water1`, `IAPWS95`, and the ice phases (Ih, II, III, V, VI, VII/X) in the H₂O solid-liquid-vapor phase diagram.
+7. B. Journaux, J. M. Brown, A. Pacheco, S. D. Vance, A. Cochrane, T. Bollengier, et al., "Holistic approach for studying planetary hydrospheres: Gibbs representations, ices thermodynamics, transport, and the example of Europa," *J. Geophys. Res.: Planets* **125**, e2019JE006176 (2020). [doi:10.1029/2019JE006176](https://doi.org/10.1029/2019JE006176) -- Source of the SeaFreeze GLBF tensor-product B-spline coefficients used for `water1`, `IAPWS95`, and the ice phases (Ih, II, III, V, VI, VII/X) in the H₂O solid-liquid-vapor phase diagram.
 
-7. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment and the saturation/triple-point lines in the H₂O phase diagram.
+8. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment and the saturation/triple-point lines in the H₂O phase diagram.
 
-8. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation used for the Ice Ih/vapor boundary below 273.16 K in the H₂O phase diagram.
+9. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation used for the Ice Ih/vapor boundary below 273.16 K in the H₂O phase diagram.
 
 ## Authors
 
@@ -432,7 +442,7 @@ fallback is used. Results are identical; only speed differs.
 
 ## Citing waterEoS
 
-If you use waterEoS in your research, please cite both this package and the underlying EoS papers. Each model implemented in waterEoS has its own published reference (Holten 2014, Caupin 2019, Duska 2020, Grenke 2025, Singh 2017, Journaux 2020, Wagner & Pruß 2002) listed in the [References](#references) section above; please cite the original papers for the specific models you use, in addition to this software package.
+If you use waterEoS in your research, please cite both this package and the underlying EoS papers. Each model implemented in waterEoS has its own published reference (Holten 2014, Caupin 2019, Duska 2020, Shi & Tanaka 2020, Grenke 2025, Singh 2017, Journaux 2020, Wagner & Pruß 2002) listed in the [References](#references) section above; please cite the original papers for the specific models you use, in addition to this software package.
 
 BibTeX entry for the software package:
 
@@ -442,7 +452,7 @@ BibTeX entry for the software package:
   title        = {{waterEoS}: Thermodynamic equations of state for supercooled water},
   year         = {2026},
   url          = {https://github.com/anthony-consiglio/waterEoS},
-  version      = {0.4.0},
+  version      = {0.5.0},
   license      = {GPL-3.0-only},
 }
 ```

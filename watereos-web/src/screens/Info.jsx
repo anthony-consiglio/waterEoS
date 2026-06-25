@@ -56,6 +56,10 @@ const REFERENCES = [
         text: 'M. Duška. "Water above the spinodal." J. Chem. Phys. 152, 174501 (2020).',
       },
       {
+        key: 'shi_tanaka2020',
+        text: 'R. Shi and H. Tanaka. "The anomalies and criticality of liquid water." Proc. Natl. Acad. Sci. 117, 26591–26599 (2020). Provides both the hierarchical two-state thermodynamic EoS (\'shi_tanaka2020\') and a coupled transport model (\'shi_tanaka2020_transport\') for viscosity, self-diffusion, and rotational relaxation.',
+      },
+      {
         key: 'grenke2025',
         text: 'L. M. Grenke and J. A. W. Elliott. "A new Tait-Tammann equation of state for liquid water." J. Phys. Chem. B 129, 1997–2012 (2025). Correction: J. Phys. Chem. B 129, 9850–9853 (2025).',
       },

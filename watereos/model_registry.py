@@ -202,11 +202,41 @@ MODEL_REGISTRY = {
         P_min=0.0, P_max=400,
         properties=TRANSPORT_PROPS,
     ),
+    'shi_tanaka2020': ModelInfo(
+        display_name='Shi & Tanaka (2020)',
+        model_key='shi_tanaka2020',
+        is_two_state=True,
+        has_phase_diagram=False,
+        has_transport=False,
+        # Fitted to scattering, density, kappaT, alphaP, Cp data over
+        # roughly 240-320 K at 0.1 MPa, validated against negative-P
+        # density to -110 MPa. The model puts the LLCP at 184 K / 173 MPa
+        # but the paper argues it has negligible impact in the
+        # experimentally accessible regime.
+        T_min=180, T_max=320,
+        P_min=-110, P_max=200,
+        properties=TWO_STATE_PROPS,
+    ),
+    'shi_tanaka2020_transport': ModelInfo(
+        display_name='Shi & Tanaka (2020) transport',
+        model_key='shi_tanaka2020_transport',
+        is_two_state=True,
+        has_phase_diagram=False,
+        has_transport=True,
+        # Transport range matches the thermodynamic envelope above; the
+        # dynamic Schottky line s^D = 1/2 falls at T ~ 207 K at 0.1 MPa,
+        # close to homogeneous nucleation, so transport extrapolation
+        # below ~205 K becomes very sensitive.
+        T_min=180, T_max=320,
+        P_min=-110, P_max=200,
+        properties=TRANSPORT_PROPS,
+    ),
 }
 
 # Ordered list for consistent UI display
 MODEL_ORDER = [
     'duska2020', 'holten2014', 'caupin2019', 'caupin2019_kim',
+    'shi_tanaka2020', 'shi_tanaka2020_transport',
     'grenke2025', 'singh2017',
     'water1', 'IAPWS95',
 ]

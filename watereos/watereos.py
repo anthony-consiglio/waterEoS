@@ -10,6 +10,8 @@ Provides a single ``getProp(PT, model)`` interface that dispatches to:
   - ``'duska2020'``   -- Duska (2020) EOS-VaT
   - ``'grenke2025'``  -- Grenke & Elliott (2025) Tait-Tammann
   - ``'singh2017'``   -- Singh, Issenmann & Caupin (2017) transport
+  - ``'shi_tanaka2020'``           -- Shi & Tanaka (2020) hierarchical two-state
+  - ``'shi_tanaka2020_transport'`` -- same, with viscosity / D / tau_R
 """
 
 import warnings
@@ -19,7 +21,9 @@ import numpy as np
 from watereos._common import _is_grid_input
 from watereos.model_registry import MODEL_REGISTRY
 
-_MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'grenke2025', 'singh2017']
+_MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
+           'duska2020', 'grenke2025', 'singh2017',
+           'shi_tanaka2020', 'shi_tanaka2020_transport']
 
 # Case-insensitive lookup  ->  canonical name
 _CANONICAL = {name.lower(): name for name in _MODELS}
@@ -171,6 +175,14 @@ def getProp(PT, model):
 
     if canonical == 'singh2017':
         from singh_viscosity import getProp as _gp
+        return _gp(PT)
+
+    if canonical == 'shi_tanaka2020':
+        from shi_tanaka_eos import getProp as _gp
+        return _gp(PT)
+
+    if canonical == 'shi_tanaka2020_transport':
+        from shi_tanaka_transport import getProp as _gp
         return _gp(PT)
 
 
