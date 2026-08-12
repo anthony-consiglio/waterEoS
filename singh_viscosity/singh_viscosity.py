@@ -47,7 +47,7 @@ _BATCH_KEYS = (
 _BATCH_KEYS = list(dict.fromkeys(_BATCH_KEYS))
 
 
-def getProp(PT, phase=None):
+def getProp(PT, phase=None, backbone='holten2014'):
     """
     Compute transport and thermodynamic properties.
 
@@ -58,13 +58,17 @@ def getProp(PT, phase=None):
         Scatter mode: object array of (P_MPa, T_K) tuples
     phase : str, optional
         Ignored. Accepted for SeaFreeze API compatibility.
+    backbone : str, optional
+        Two-state EoS supplying the LDS fraction: 'holten2014' (default,
+        published parameters), 'caupin2019' or 'duska2020' (parameters
+        refitted in this repo against the original experimental datasets).
 
     Returns
     -------
     TransportStates
         Object with attributes:
           Transport: eta (Pa*s), D (m^2/s), tau_r (s), f (LDS fraction)
-          Thermodynamic (from Holten backbone): rho, V, S, Cp, Cv, Kt, Ks,
+          Thermodynamic (from the backbone EoS): rho, V, S, Cp, Cv, Kt, Ks,
             alpha, vel, x, G, H, U, A, and _A/_B suffixed state properties.
     """
     out = TransportStates()
@@ -79,7 +83,7 @@ def getProp(PT, phase=None):
         T_flat = T_grid.ravel()
         P_flat = P_grid.ravel()
 
-        batch = compute_batch(T_flat, P_flat)
+        batch = compute_batch(T_flat, P_flat, backbone=backbone)
 
         for k in _BATCH_KEYS:
             if k in batch:
@@ -95,7 +99,7 @@ def getProp(PT, phase=None):
         P_flat = pairs[:, 0]
         T_flat = pairs[:, 1]
 
-        batch = compute_batch(T_flat, P_flat)
+        batch = compute_batch(T_flat, P_flat, backbone=backbone)
 
         for k in _BATCH_KEYS:
             if k in batch:

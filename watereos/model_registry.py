@@ -202,6 +202,32 @@ MODEL_REGISTRY = {
         P_min=0.0, P_max=400,
         properties=TRANSPORT_PROPS,
     ),
+    'singh2017_caupin2019': ModelInfo(
+        display_name='Singh (2017) / Caupin backbone',
+        model_key='singh2017_caupin2019',
+        is_two_state=True,
+        has_phase_diagram=False,
+        has_transport=True,
+        # Same experimental transport data envelope as singh2017; the
+        # LDS fraction comes from the Caupin (2019) EoS with parameters
+        # refitted in this repo (scripts/refit_singh_transport.py).
+        T_min=200, T_max=300,
+        P_min=0.0, P_max=400,
+        properties=TRANSPORT_PROPS,
+    ),
+    'singh2017_duska2020': ModelInfo(
+        display_name='Singh (2017) / Duska backbone',
+        model_key='singh2017_duska2020',
+        is_two_state=True,
+        has_phase_diagram=False,
+        has_transport=True,
+        # Same experimental transport data envelope as singh2017; the
+        # LDS fraction comes from the Duska (2020) EoS with parameters
+        # refitted in this repo (scripts/refit_singh_transport.py).
+        T_min=200, T_max=300,
+        P_min=0.0, P_max=400,
+        properties=TRANSPORT_PROPS,
+    ),
     'shi_tanaka2020': ModelInfo(
         display_name='Shi & Tanaka (2020)',
         model_key='shi_tanaka2020',
@@ -237,7 +263,7 @@ MODEL_REGISTRY = {
 MODEL_ORDER = [
     'duska2020', 'holten2014', 'caupin2019', 'caupin2019_kim',
     'shi_tanaka2020', 'shi_tanaka2020_transport',
-    'grenke2025', 'singh2017',
+    'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
     'water1', 'IAPWS95',
 ]
 

@@ -15,7 +15,7 @@ class ThermodynamicStates:
     Per-state properties (suffixed ``_A`` for HDL, ``_B`` for LDL)
         rho_A, V_A, S_A, G_A, ... vel_A, rho_B, V_B, ... vel_B
 
-    Transport properties (``singh2017`` only)
+    Transport properties (``singh2017*`` and ``shi_tanaka2020_transport``)
         eta, D, tau_r, f
 
     Each attribute is a numpy array whose shape depends on the input:

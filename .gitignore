@@ -43,16 +43,18 @@ figures/
 *.png
 !watereos_visualizer/assets/*.png
 !docs/*.png
+!references/data/*.png
 *.jpeg
 *.html
 !docs/*.html
 
 # Debug / scratch
 adam_error.txt
-plot_*.py
+/plot_*.py
 
-# Reference PDFs
-references/
+# Reference PDFs (extracted datasets in references/data/ are tracked)
+references/*
+!references/data/
 
 # Local tool settings
 .claude/

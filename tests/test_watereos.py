@@ -40,9 +40,11 @@ def test_list_models():
     from watereos import list_models
     models = list_models()
     assert isinstance(models, list)
-    assert len(models) == 8
+    assert len(models) == 12
     assert 'duska2020' in models
     assert 'caupin2019' in models
+    assert 'singh2017_caupin2019' in models
+    assert 'singh2017_duska2020' in models
     assert 'caupin2019_kim' in models
     assert 'holten2014' in models
     assert 'grenke2025' in models

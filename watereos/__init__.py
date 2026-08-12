@@ -26,7 +26,8 @@ Or ``getProp()`` for SeaFreeze-compatible grid/scatter input::
 
 Available models: ``'holten2014'``, ``'caupin2019'``, ``'caupin2019_kim'``,
 ``'duska2020'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
-``'grenke2025'``, ``'singh2017'``, ``'water1'``, ``'IAPWS95'``.
+``'grenke2025'``, ``'singh2017'``, ``'singh2017_caupin2019'``,
+``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``.
 
 See ``watereos.model_registry.MODEL_REGISTRY`` for metadata on each model,
 or call ``list_models()`` for a quick summary. Call ``backend()`` to see
