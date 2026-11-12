@@ -20,6 +20,7 @@ Usage (identical to SeaFreeze):
 """
 
 from watereos.two_state_eos import getProp as _getProp
+from .core import compute_batch as _numpy_batch
 
 # Backend dispatch: Rust → JAX → numpy. See caupin_eos.caupin_eos for rationale.
 try:
@@ -31,6 +32,12 @@ except ImportError:
         from .core import compute_batch
 
 
-def getProp(PT, phase=None):
-    """Compute thermodynamic properties using the EOS-VaT model."""
-    return _getProp(PT, compute_batch, phase)
+def getProp(PT, phase=None, branch='stable'):
+    """Compute thermodynamic properties using the EOS-VaT model.
+
+    ``branch`` selects the liquid state: ``'stable'`` (default, lowest
+    Gibbs energy), ``'hdl'`` or ``'ldl'``; see
+    ``watereos.two_state_branch``.
+    """
+    return _getProp(PT, compute_batch, phase, branch=branch,
+                    numpy_batch=_numpy_batch)

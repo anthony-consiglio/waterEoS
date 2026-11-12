@@ -18,6 +18,10 @@ class ThermodynamicStates:
     Transport properties (``singh2017*`` and ``shi_tanaka2020_transport``)
         eta, D, tau_r, f
 
+    Branch flag (only when ``branch='hdl'`` or ``'ldl'`` was requested)
+        metastable -- True where the returned liquid state is a local
+        minimum of the Gibbs energy but not the lowest one
+
     Each attribute is a numpy array whose shape depends on the input:
 
     * **Grid mode** ``PT = [P_array, T_array]`` — shape ``(len(P), len(T))``

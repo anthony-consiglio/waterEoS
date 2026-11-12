@@ -6,6 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rayon::prelude::*;
 
+use crate::branch::{mask_mixture, select_branch, Branch};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Parameter sets (caupin_eos/params.py = Table III, params_kim.py = Table II)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -268,11 +270,12 @@ struct PointResult {
     cp_a: f64, cv_a: f64, kt_a: f64, ks_a: f64, alpha_a: f64, vel_a: f64,
     rho_b: f64, v_b: f64, s_b: f64, g_b: f64, h_b: f64, u_b: f64, a_b: f64,
     cp_b: f64, cv_b: f64, kt_b: f64, ks_b: f64, alpha_b: f64, vel_b: f64,
+    metastable: bool,
 }
 
 #[inline]
 #[allow(non_snake_case)]
-fn compute_point(t_k: f64, p_mpa: f64, prm: &CaupinParams) -> PointResult {
+fn compute_point(t_k: f64, p_mpa: f64, prm: &CaupinParams, branch: Branch) -> PointResult {
     let (TC, PC, P_SCALE_MPA, OMEGA0, S_OFFSET, H_OFFSET) =
         (prm.tc, prm.pc, prm.p_scale_mpa, prm.omega0, prm.s_offset, prm.h_offset);
     let d_th = (t_k - TC) / TC;
@@ -292,7 +295,12 @@ fn compute_point(t_k: f64, p_mpa: f64, prm: &CaupinParams) -> PointResult {
     let (gba, dgba_dp, dgba_dt, d2gba_dp2, d2gba_dt2, d2gba_dpdt) = compute_gba(d_th, d_ph, prm);
     let (om, _dom_dp, _dom_dt, _d2om_dp2, _d2om_dt2, _d2om_dpdt) = compute_omega(d_th, d_ph, prm);
 
-    let x = solve_x_stable(gba, th, om);
+    // F / T-hat has the normalized form L + ln(x/(1-x)) + omega (1-2x).
+    let (x, metastable) = if branch == Branch::Stable {
+        (solve_x_stable(gba, th, om), false)
+    } else {
+        select_branch(gba / th, om, branch)
+    };
 
     let big_om = th * om;
     let dom_dp_big = OMEGA0;
@@ -347,11 +355,16 @@ fn compute_point(t_k: f64, p_mpa: f64, prm: &CaupinParams) -> PointResult {
     let h_a = g_a + t_k * s_a; let u_a = h_a - p_pa * v_a; let a_a = g_a - p_pa * v_a;
     let h_b = g_b + t_k * s_b; let u_b = h_b - p_pa * v_b; let a_b = g_b - p_pa * v_b;
 
-    PointResult {
+    let mut r = PointResult {
         rho, v, s, g, h, u: u_pot, a: a_pot, cp, cv, kt, ks, alpha, vel, x,
         rho_a, v_a, s_a, g_a, h_a, u_a, a_a, cp_a, cv_a, kt_a, ks_a, alpha_a, vel_a,
         rho_b, v_b, s_b, g_b, h_b, u_b, a_b, cp_b, cv_b, kt_b, ks_b, alpha_b, vel_b,
+        metastable,
+    };
+    if x.is_nan() {
+        mask_mixture!(r);
     }
+    r
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -363,7 +376,9 @@ fn caupin_compute_batch<'py>(
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
     prm: &'static CaupinParams,
+    branch: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let branch = Branch::parse(branch)?;
     let t_vec: Vec<f64>;
     let p_vec: Vec<f64>;
     let t_data: &[f64] = match t_k.as_slice() {
@@ -409,7 +424,7 @@ fn caupin_compute_batch<'py>(
     let points: Vec<PointResult> = py.allow_threads(|| {
         (0..n)
             .into_par_iter()
-            .map(|i| compute_point(t_data[i], p_data[i], prm))
+            .map(|i| compute_point(t_data[i], p_data[i], prm, branch))
             .collect()
     });
 
@@ -470,25 +485,37 @@ fn caupin_compute_batch<'py>(
     dict.set_item("Ks_B", ks_b.into_pyarray(py))?;
     dict.set_item("alpha_B", alpha_b.into_pyarray(py))?;
     dict.set_item("vel_B", vel_b.into_pyarray(py))?;
+    if branch != Branch::Stable {
+        let meta: Vec<bool> = points.iter().map(|r| r.metastable).collect();
+        dict.set_item("metastable", Array1::from_vec(meta).into_pyarray(py))?;
+    }
     Ok(dict)
 }
 
 /// Caupin (2019) Table III fit — without Kim et al. kT data (default).
+///
+/// `branch` is "stable" (default), "hdl" or "ldl"; see branch.rs.
 #[pyfunction]
+#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
 pub fn compute_batch_caupin<'py>(
     py: Python<'py>,
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
+    branch: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
-    caupin_compute_batch(py, t_k, p_mpa, &PARAMS)
+    caupin_compute_batch(py, t_k, p_mpa, &PARAMS, branch)
 }
 
 /// Caupin (2019) Table II fit — with Kim et al. kT data.
+///
+/// `branch` is "stable" (default), "hdl" or "ldl"; see branch.rs.
 #[pyfunction]
+#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
 pub fn compute_batch_caupin_kim<'py>(
     py: Python<'py>,
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
+    branch: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
-    caupin_compute_batch(py, t_k, p_mpa, &PARAMS_KIM)
+    caupin_compute_batch(py, t_k, p_mpa, &PARAMS_KIM, branch)
 }

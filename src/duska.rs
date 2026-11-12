@@ -9,6 +9,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rayon::prelude::*;
 
+use crate::branch::{mask_mixture, select_branch, Branch};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants from duska_eos/params.py
 // ═══════════════════════════════════════════════════════════════════════════
@@ -330,10 +332,11 @@ struct PointResult {
     cp_a: f64, cv_a: f64, kt_a: f64, ks_a: f64, alpha_a: f64, vel_a: f64,
     rho_b: f64, v_b: f64, s_b: f64, g_b: f64, h_b: f64, u_b: f64, a_b: f64,
     cp_b: f64, cv_b: f64, kt_b: f64, ks_b: f64, alpha_b: f64, vel_b: f64,
+    metastable: bool,
 }
 
 #[inline]
-fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
+fn compute_point(t_k: f64, p_mpa: f64, branch: Branch) -> PointResult {
     let th = t_k / T_VLCP;
     let ph = p_mpa / P_VLCP;
 
@@ -348,7 +351,12 @@ fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
     let (om, dom_dp, dom_dt) = compute_omega(ph, th);
 
     // Solve for x
-    let x = solve_x_stable(dg, th, om);
+    // F / T-hat has the normalized form L + ln(x/(1-x)) + omega (1-2x).
+    let (x, metastable) = if branch == Branch::Stable {
+        (solve_x_stable(dg, th, om), false)
+    } else {
+        select_branch(dg / th, om / th, branch)
+    };
 
     // ── Mixture volume and entropy ───────────────────────────────────
     let delta_v = ddg_dp;
@@ -442,26 +450,35 @@ fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
     let u_b = h_b - p_pa * v_b;
     let a_b = g_b_phys - p_pa * v_b;
 
-    PointResult {
+    let mut r = PointResult {
         rho, v: v_spec, s: s_val, g: g_phys, h, u: u_pot, a: a_pot,
         cp, cv, kt, ks, alpha, vel, x,
         rho_a, v_a, s_a: s_a_val, g_a: g_a_phys, h_a, u_a, a_a,
         cp_a, cv_a, kt_a, ks_a, alpha_a, vel_a,
         rho_b, v_b, s_b: s_b_val, g_b: g_b_phys, h_b, u_b, a_b,
         cp_b, cv_b, kt_b, ks_b, alpha_b, vel_b,
+        metastable,
+    };
+    if x.is_nan() {
+        mask_mixture!(r);
     }
+    r
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PyO3 entry point
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// `branch` is "stable" (default), "hdl" or "ldl"; see branch.rs.
 #[pyfunction]
+#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
 pub fn compute_batch_duska<'py>(
     py: Python<'py>,
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
+    branch: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let branch = Branch::parse(branch)?;
     let t_vec: Vec<f64>;
     let p_vec: Vec<f64>;
     let t_data: &[f64] = match t_k.as_slice() {
@@ -502,7 +519,7 @@ pub fn compute_batch_duska<'py>(
     let points: Vec<PointResult> = py.allow_threads(|| {
         (0..n)
             .into_par_iter()
-            .map(|i| compute_point(t_data[i], p_data[i]))
+            .map(|i| compute_point(t_data[i], p_data[i], branch))
             .collect()
     });
 
@@ -563,5 +580,9 @@ pub fn compute_batch_duska<'py>(
     dict.set_item("Ks_B", ks_b.into_pyarray(py))?;
     dict.set_item("alpha_B", alpha_b.into_pyarray(py))?;
     dict.set_item("vel_B", vel_b.into_pyarray(py))?;
+    if branch != Branch::Stable {
+        let meta: Vec<bool> = points.iter().map(|r| r.metastable).collect();
+        dict.set_item("metastable", Array1::from_vec(meta).into_pyarray(py))?;
+    }
     Ok(dict)
 }

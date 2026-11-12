@@ -10,6 +10,7 @@ compute_batch callable.
 import numpy as np
 
 from watereos._common import ThermodynamicStates, _is_grid_input
+from watereos.two_state_branch import normalize_branch
 
 _MIX_KEYS = ['rho', 'V', 'S', 'G', 'H', 'U', 'A', 'Cp', 'Cv',
              'Kt', 'Ks', 'Kp', 'alpha', 'vel', 'x']
@@ -25,7 +26,22 @@ _ALL_KEYS = (
 _BATCH_KEYS = [k for k in _ALL_KEYS if k not in ('Kp', 'Kp_A', 'Kp_B')]
 
 
-def getProp(PT, compute_batch, phase=None):
+def _batch_on_branch(compute_batch, numpy_batch, T_flat, P_flat, branch):
+    """Evaluate a model on a non-default branch.
+
+    The Rust and NumPy backends take ``branch`` directly.  A backend that
+    does not (the JAX path, or a Rust extension built before branch
+    selection existed) rejects the keyword; the NumPy core is used instead.
+    """
+    try:
+        return compute_batch(T_flat, P_flat, branch=branch)
+    except TypeError as exc:
+        if numpy_batch is None or 'branch' not in str(exc):
+            raise
+    return numpy_batch(T_flat, P_flat, branch=branch)
+
+
+def getProp(PT, compute_batch, phase=None, branch='stable', numpy_batch=None):
     """Compute thermodynamic properties for a two-state EoS model.
 
     Parameters
@@ -37,13 +53,31 @@ def getProp(PT, compute_batch, phase=None):
         Model's compute_batch(T_flat, P_flat) -> dict of arrays.
     phase : str, optional
         Ignored. Accepted for SeaFreeze API compatibility.
+    branch : {'stable', 'hdl', 'ldl'}, optional
+        Which liquid state to return: the one with the lowest Gibbs
+        energy (default), the high-density liquid or the low-density
+        liquid.  See ``watereos.two_state_branch``.
+    numpy_batch : callable, optional
+        The model's NumPy ``compute_batch``, used for a non-default branch
+        when ``compute_batch`` does not accept the ``branch`` keyword.
 
     Returns
     -------
     ThermodynamicStates
         Object with attributes: rho, V, S, Cp, Cv, Kt, Ks, alpha, vel,
-        x, and _A / _B suffixed versions for each pure state.
+        x, and _A / _B suffixed versions for each pure state.  With
+        ``branch='hdl'`` or ``'ldl'`` it also has ``metastable`` (bool
+        array), and the mixture properties are NaN where that branch
+        does not exist.
     """
+    branch = normalize_branch(branch)
+
+    def _batch(T_flat, P_flat):
+        if branch == 'stable':
+            return compute_batch(T_flat, P_flat)
+        return _batch_on_branch(compute_batch, numpy_batch,
+                                T_flat, P_flat, branch)
+
     out = ThermodynamicStates()
 
     if _is_grid_input(PT):
@@ -55,11 +89,14 @@ def getProp(PT, compute_batch, phase=None):
         T_flat = T_grid.ravel()
         P_flat = P_grid.ravel()
 
-        batch = compute_batch(T_flat, P_flat)
+        batch = _batch(T_flat, P_flat)
 
         arrays = {}
         for k in _BATCH_KEYS:
             arrays[k] = batch[k].reshape(nP, nT)
+        if branch != 'stable':
+            arrays['metastable'] = np.asarray(
+                batch['metastable'], dtype=bool).reshape(nP, nT)
 
         # Kp not computed in batch mode -- fill with NaN
         for kp_key in ('Kp', 'Kp_A', 'Kp_B'):
@@ -71,11 +108,13 @@ def getProp(PT, compute_batch, phase=None):
         P_flat = np.ascontiguousarray(pairs[:, 0])
         T_flat = np.ascontiguousarray(pairs[:, 1])
 
-        batch = compute_batch(T_flat, P_flat)
+        batch = _batch(T_flat, P_flat)
 
         arrays = {}
         for k in _BATCH_KEYS:
             arrays[k] = batch[k]
+        if branch != 'stable':
+            arrays['metastable'] = np.asarray(batch['metastable'], dtype=bool)
 
         # Kp not computed in batch mode -- fill with NaN
         for kp_key in ('Kp', 'Kp_A', 'Kp_B'):

@@ -9,6 +9,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rayon::prelude::*;
 
+use crate::branch::{mask_mixture, select_branch, Branch};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants from holten_eos/params.py
 // ═══════════════════════════════════════════════════════════════════════════
@@ -226,6 +228,7 @@ struct PointResult {
     cp_a: f64, cv_a: f64, kt_a: f64, ks_a: f64, alpha_a: f64, vel_a: f64,
     rho_b: f64, v_b: f64, s_b: f64, g_b: f64, h_b: f64, u_b: f64, a_b: f64,
     cp_b: f64, cv_b: f64, kt_b: f64, ks_b: f64, alpha_b: f64, vel_b: f64,
+    metastable: bool,
 }
 
 /// Convert reduced (v, s, kap, alp, cp) to physical SI units.
@@ -264,7 +267,7 @@ fn to_physical(
 }
 
 #[inline]
-fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
+fn compute_point(t_k: f64, p_mpa: f64, branch: Branch) -> PointResult {
     let p_pa = p_mpa * 1e6;
     let tau = t_k / TC;
     let pi = (p_pa - P0 * 1e6) / P_SCALE_PA;
@@ -281,7 +284,11 @@ fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
     let omega = 2.0 + OMEGA0 * p_red;
 
     // Equilibrium x
-    let x = findxe(l, omega);
+    let (x, metastable) = if branch == Branch::Stable {
+        (findxe(l, omega), false)
+    } else {
+        select_branch(l, omega, branch)
+    };
 
     // ── Mixture (phi/chi formulation, MATLAB lines 104-127) ──────────
     let f = 2.0 * x - 1.0;
@@ -359,26 +366,35 @@ fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
     let u_b = h_b - p_pa_f * v_b_spec;
     let a_b = g_b_phys - p_pa_f * v_b_spec;
 
-    PointResult {
+    let mut r = PointResult {
         rho, v: v_spec, s: s_val, g: g_phys, h, u: u_pot, a: a_pot,
         cp, cv, kt, ks, alpha, vel, x,
         rho_a, v_a: v_a_spec, s_a: s_a_val, g_a: g_a_phys, h_a, u_a, a_a,
         cp_a, cv_a, kt_a, ks_a, alpha_a, vel_a,
         rho_b, v_b: v_b_spec, s_b: s_b_val, g_b: g_b_phys, h_b, u_b, a_b,
         cp_b, cv_b, kt_b, ks_b, alpha_b, vel_b,
+        metastable,
+    };
+    if x.is_nan() {
+        mask_mixture!(r);
     }
+    r
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PyO3 entry point
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// `branch` is "stable" (default), "hdl" or "ldl"; see branch.rs.
 #[pyfunction]
+#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
 pub fn compute_batch_holten<'py>(
     py: Python<'py>,
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
+    branch: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let branch = Branch::parse(branch)?;
     let t_vec: Vec<f64>;
     let p_vec: Vec<f64>;
     let t_data: &[f64] = match t_k.as_slice() {
@@ -419,7 +435,7 @@ pub fn compute_batch_holten<'py>(
     let points: Vec<PointResult> = py.allow_threads(|| {
         (0..n)
             .into_par_iter()
-            .map(|i| compute_point(t_data[i], p_data[i]))
+            .map(|i| compute_point(t_data[i], p_data[i], branch))
             .collect()
     });
 
@@ -480,5 +496,9 @@ pub fn compute_batch_holten<'py>(
     dict.set_item("Ks_B", ks_b.into_pyarray(py))?;
     dict.set_item("alpha_B", alpha_b.into_pyarray(py))?;
     dict.set_item("vel_B", vel_b.into_pyarray(py))?;
+    if branch != Branch::Stable {
+        let meta: Vec<bool> = points.iter().map(|r| r.metastable).collect();
+        dict.set_item("metastable", Array1::from_vec(meta).into_pyarray(py))?;
+    }
     Ok(dict)
 }

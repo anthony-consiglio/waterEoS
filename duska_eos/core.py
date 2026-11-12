@@ -12,6 +12,8 @@ J. Chem. Phys. 152, 174501 (2020).
 import math
 import numpy as np
 from . import params as P
+from watereos.two_state_branch import (
+    normalize_branch, select_branch, mask_mixture)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -774,7 +776,7 @@ def _SA_vec(ph, Th):
     return SA
 
 
-def compute_batch(T_K, p_MPa):
+def compute_batch(T_K, p_MPa, branch='stable'):
     """
     Vectorized computation of all thermodynamic properties.
 
@@ -782,6 +784,10 @@ def compute_batch(T_K, p_MPa):
     ----------
     T_K   : 1-D array — temperature in K
     p_MPa : 1-D array — pressure in MPa
+    branch : str — which liquid state to return: 'stable' (default,
+            lowest Gibbs energy), 'hdl' (minimum with x <= 1/2) or
+            'ldl' (minimum with x >= 1/2). See
+            watereos.two_state_branch.
 
     Returns
     -------
@@ -789,7 +795,12 @@ def compute_batch(T_K, p_MPa):
         rho, V, S, G, H, U, A, Cp, Cv, Kt, Ks, alpha, vel, x,
         rho_A, V_A, S_A, G_A, H_A, U_A, A_A, Cp_A, Cv_A, Kt_A, Ks_A, alpha_A, vel_A,
         rho_B, V_B, S_B, G_B, H_B, U_B, A_B, Cp_B, Cv_B, Kt_B, Ks_B, alpha_B, vel_B
+    With branch 'hdl' or 'ldl' the dict also holds 'metastable' (bool
+    array, True where the returned state is a local minimum that is not
+    the lowest one), and the mixture properties are NaN where the
+    requested branch does not exist.
     """
+    branch = normalize_branch(branch)
     T_K = np.asarray(T_K, dtype=float)
     p_MPa = np.asarray(p_MPa, dtype=float)
     n = len(T_K)
@@ -852,7 +863,11 @@ def compute_batch(T_K, p_MPa):
     dom_dT = P.w[0] * (P.w[2] + P.w[3]*ph)
 
     # ── (f) Equilibrium solver ──────────────────────────────────────────
-    x = _solve_x_vec_duska(DG, Th, om)
+    if branch == 'stable':
+        x = _solve_x_vec_duska(DG, Th, om)
+    else:
+        # F / T-hat has the normalized form L + ln(x/(1-x)) + omega (1-2x)
+        x, metastable = select_branch(DG / Th, om / Th, branch)
 
     # ── (g) Mixture volume and entropy (Eqs. 36-37) ────────────────────
     DeltaV = dDG_dp
@@ -1008,4 +1023,7 @@ def compute_batch(T_K, p_MPa):
         'U_B': U_B, 'A_B': A_pot_B, 'Cp_B': Cp_B, 'Cv_B': Cv_B,
         'Kt_B': Kt_B, 'Ks_B': Ks_B, 'alpha_B': alpha_B, 'vel_B': vel_B,
     }
+    if branch != 'stable':
+        result['metastable'] = metastable
+        mask_mixture(result, x)
     return result

@@ -19,6 +19,7 @@ Usage (identical to SeaFreeze and duska_eos):
 """
 
 from watereos.two_state_eos import getProp as _getProp
+from .core import compute_batch as _numpy_batch
 
 # Backend dispatch (priority order):
 #   1. Rust (watereos_rs) — fastest; built-in to the published wheel
@@ -35,6 +36,12 @@ except ImportError:
         from .core import compute_batch
 
 
-def getProp(PT, phase=None):
-    """Compute thermodynamic properties using the Caupin EoS."""
-    return _getProp(PT, compute_batch, phase)
+def getProp(PT, phase=None, branch='stable'):
+    """Compute thermodynamic properties using the Caupin EoS.
+
+    ``branch`` selects the liquid state: ``'stable'`` (default, lowest
+    Gibbs energy), ``'hdl'`` or ``'ldl'``; see
+    ``watereos.two_state_branch``.
+    """
+    return _getProp(PT, compute_batch, phase, branch=branch,
+                    numpy_batch=_numpy_batch)

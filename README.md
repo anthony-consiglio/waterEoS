@@ -170,6 +170,9 @@ The thermodynamic stability limit: the curve in (T, P) space where the
 compressibility diverges and the free energy has an inflection point. Beyond
 the spinodal, the system is unstable and must separate into two phases.
 Two-state models have both an **HDL spinodal** and an **LDL spinodal**.
+Between the binodal and its spinodal a liquid is metastable; pass
+`branch='hdl'` or `branch='ldl'` to follow it there (see
+[Metastable liquid branches](#metastable-liquid-branches)).
 </details>
 
 <details>
@@ -322,6 +325,36 @@ result = compute_phase_diagram()
 ```
 
 Available functions: `find_LLCP()`, `compute_spinodal_curve()`, `compute_binodal_curve()`, `compute_phase_diagram()`.
+
+### Metastable liquid branches
+
+Below the liquid-liquid critical point the two-state models have two liquid states between the spinodals: the high-density liquid (HDL) and the low-density liquid (LDL). By default `getProp()` and `compute()` return the one with the lowest Gibbs energy, so every property jumps at the liquid-liquid transition. The `branch` argument follows one liquid instead, through the transition and into its metastable range:
+
+```python
+import numpy as np
+from watereos import compute
+
+T = np.arange(215.0, 185.0, -5.0)                 # cooling at 150 MPa
+stable = compute(T, 150.0, 'caupin2019')            # jumps near 199.8 K
+hdl = compute(T, 150.0, 'caupin2019', branch='hdl') # smooth metastable extension
+ldl = compute(T, 150.0, 'caupin2019', branch='ldl')
+
+stable.x[0]        # [0.189 0.190 0.190 0.189 0.842 0.866]
+hdl.x[0]           # [0.189 0.190 0.190 0.189 0.186 0.182]
+hdl.metastable[0]  # [False False False False  True  True]
+ldl.x[0]           # [  nan   nan 0.760 0.810 0.842 0.866]
+```
+
+| `branch` | Returns |
+|----------|---------|
+| `'stable'` (default) | The liquid with the lowest Gibbs energy. Unchanged from earlier versions. |
+| `'hdl'` | The high-density liquid (`x` &le; 1/2): the stable liquid on the high-density side of the transition, and its metastable continuation down to the HDL spinodal. |
+| `'ldl'` | The low-density liquid (`x` &ge; 1/2): the stable liquid on the low-density side of the transition, and its metastable continuation up to the LDL spinodal. |
+
+- Where the requested liquid does not exist (beyond its spinodal, or on the other side of the line `x` = 1/2 that continues the transition past the critical point), the mixture properties are `NaN`. The per-state properties (`_A`, `_B`) do not depend on the branch.
+- With `'hdl'` or `'ldl'` the output also has `metastable`, a boolean array that is `True` where the returned liquid is not the one with the lowest Gibbs energy. The transition is where it switches.
+- Available for `holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`, and for the `singh2017*` transport models, where it selects the branch of the backbone that supplies the LDS fraction. Other models raise `ValueError` for a non-default branch.
+- The Rust and NumPy backends both implement it; the JAX path falls back to NumPy for a non-default branch.
 
 ### H₂O solid-liquid-vapor phase diagram
 
