@@ -1,7 +1,8 @@
 //! Duška (2020) EOS-VaT two-state EoS — Rust implementation.
 //!
 //! Direct port of `duska_eos/core.py:compute_batch` with per-point loop
-//! fusion, 16-point Gauss-Legendre quadrature, and finite-difference dSA/dTh.
+//! fusion, the closed-form Gibbs energy of state A, and finite-difference
+//! dSA/dTh.
 
 use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
@@ -44,27 +45,10 @@ const W_OM: [f64; 4] = [4.1420925e-1, 3.6615174e-2, 1.6181775e+0, 7.1477190e-3];
 // entropy coefficients (s0..s3)
 const S_ENT: [f64; 4] = [-6.3674996e+0, 8.7732559e+1, -1.7214704e+2, 1.1210116e+2];
 
+// IAPWS-95 reference-state alignment (duska_eos/params.py). H_OFFSET also
+// absorbs the arbitrary additive constant of the closed-form g_A below.
 const S_OFFSET: f64 = -13463.3332601599;
-const H_OFFSET: f64 = -9540603.2122842800;
-
-// 16-point Gauss-Legendre nodes and weights on [-1, 1]
-const GL_N: usize = 16;
-const GL_NODES: [f64; GL_N] = [
-    -0.9894009349916499, -0.9445750230732326, -0.8656312023878318,
-    -0.7554044083550030, -0.6178762444026438, -0.4580167776572274,
-    -0.2816035507792589, -0.0950125098376374,
-     0.0950125098376374,  0.2816035507792589,  0.4580167776572274,
-     0.6178762444026438,  0.7554044083550030,  0.8656312023878318,
-     0.9445750230732326,  0.9894009349916499,
-];
-const GL_WEIGHTS: [f64; GL_N] = [
-    0.0271524594117541, 0.0622535239386479, 0.0951585116824928,
-    0.1246289712555339, 0.1495959888165767, 0.1691565193950025,
-    0.1826034150449236, 0.1894506104550685,
-    0.1894506104550685, 0.1826034150449236, 0.1691565193950025,
-    0.1495959888165767, 0.1246289712555339, 0.0951585116824928,
-    0.0622535239386479, 0.0271524594117541,
-];
+const H_OFFSET: f64 = -1322279.5452823788;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Spinodal polynomials
@@ -232,39 +216,52 @@ fn solve_x_stable(dg: f64, th: f64, om: f64) -> f64 {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Gibbs energy of state A via 2-leg GL quadrature
+// Gibbs energy of state A (closed form)
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// Mirrors duska_eos/core.py (section 9), which has the derivation. The path
+// starts on the liquid-vapor spinodal of state A, where V_A = V_S and
+// S_A = S_S:
+//
+//   g_A(ph, Th) = g_S(Th) - 2 pS VS B [u - B ln(1 + u/B)],  u = sqrt(1 - ph/pS)
+//   dg_S/dTh    = -S_S(Th) + V_S(Th) dpS/dTh
+//
+// so that dg_A/dph = V_A and dg_A/dTh = -S_A hold identically. The additive
+// constant is arbitrary; H_OFFSET fixes it.
 
-#[inline]
-fn compute_g_a_integral(ph: f64, th: f64) -> f64 {
-    // Leg 1: T-integral from Th=1 to Th at ph=0
-    let mut g_t_leg = 0.0;
-    let dth_val = th - 1.0;
-    if dth_val.abs() > 1e-30 {
-        let half_dth = dth_val / 2.0;
-        for j in 0..GL_N {
-            let th_i = half_dth * (GL_NODES[j] + 1.0) + 1.0;
-            let (_, sa_i) = state_a_at(0.0, th_i);
-            g_t_leg += GL_WEIGHTS[j] * (-sa_i);
+/// Reduced Gibbs energy of state A on its spinodal, up to a constant.
+#[inline(always)]
+fn compute_gs(th: f64) -> f64 {
+    // dpS/dTh = e0 + e1*Th + e2*Th^2
+    let e = [
+        D_PS[0] - 2.0 * D_PS[1] + 3.0 * D_PS[2],
+        2.0 * D_PS[1] - 6.0 * D_PS[2],
+        3.0 * D_PS[2],
+    ];
+    // integral of VS * dpS/dTh = sum_m q_m Th^(m+1)
+    let mut q = [0.0_f64; 7];
+    for k in 0..5 {
+        for j in 0..3 {
+            q[k + j] += C_VS[k] * e[j];
         }
-        g_t_leg *= half_dth;
     }
-
-    // Leg 2: P-integral from ph=0 to ph at fixed Th
-    let mut g_p_leg = 0.0;
-    if ph.abs() > 1e-30 {
-        let (ps, vs, phi, dps, dvs, dphi) = spinodal_props(th);
-        let (b, _db) = compute_b(ps, vs, phi, dps, dvs, dphi);
-        let half_ph = ph / 2.0;
-        for j in 0..GL_N {
-            let ph_i = half_ph * (GL_NODES[j] + 1.0);
-            let (va_i, _, _) = compute_va(ph_i, ps, vs, b);
-            g_p_leg += GL_WEIGHTS[j] * va_i;
-        }
-        g_p_leg *= half_ph;
+    let mut i_vp = 0.0;
+    for m in (0..7).rev() {
+        i_vp = i_vp * th + q[m] / (m as f64 + 1.0);
     }
+    i_vp *= th;
+    // integral of S_S (compute_ss integrated once more)
+    let i_ss = S_ENT[0] * (th * th.ln() - th)
+        + th * th * (S_ENT[1] / 2.0 + th * (S_ENT[2] / 6.0 + th * (S_ENT[3] / 12.0)));
+    i_vp - i_ss
+}
 
-    g_t_leg + g_p_leg
+/// Reduced Gibbs energy of state A, up to a constant. `u` is the value
+/// returned by `compute_va`; NaN below the spinodal.
+#[inline(always)]
+fn compute_ga(th: f64, ps: f64, vs: f64, b: f64, u: f64) -> f64 {
+    let z = u / b;
+    compute_gs(th) - 2.0 * ps * vs * b * (u - b * z.ln_1p())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -406,8 +403,8 @@ fn compute_point(t_k: f64, p_mpa: f64, branch: Branch) -> PointResult {
     } else { 0.0 };
     let dsh_dt = dsh_dt_x + dshdx * dx_dth;
 
-    // ── Gibbs energy via GL integral ─────────────────────────────────
-    let g_a = compute_g_a_integral(ph, th);
+    // ── Gibbs energy of state A (closed form) ────────────────────────
+    let g_a = compute_ga(th, ps, vs, b, u);
     let g_mix = g_a + x * dg + th * mix_entropy + om * x * (1.0 - x);
     let g_b = g_a + dg;
 

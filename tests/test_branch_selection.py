@@ -205,11 +205,10 @@ def test_branches_end_at_their_spinodals(model):
 def test_thermodynamic_consistency_on_metastable_branch(model, branch):
     """V = dG/dp and S = -dG/dT hold along a metastable branch.
 
-    The entropy identity is checked on the mixing part, G - G_A and
-    S - S_A, which is everything the branch choice affects.  (In the Duska
-    model the state-A Gibbs energy comes from a quadrature, so S_A and
-    -dG_A/dT differ by up to a few percent on every branch, the default
-    included; subtracting state A keeps that out of this test.)
+    Checked on the full Gibbs energy and, separately, on the mixing part
+    G - G_A against S - S_A, which is everything the branch choice
+    affects.  tests/test_thermodynamic_consistency.py covers the whole
+    (T, p) range on every branch.
     """
     ln = _lines(model)
     if branch == 'hdl':     # metastable between the binodal and the HDL spinodal
@@ -222,9 +221,12 @@ def test_thermodynamic_consistency_on_metastable_branch(model, branch):
     dT, dp = 1e-3, 1e-3
     oT = _compute(np.array([T - dT, T + dT]), p, model, branch=branch)
     gp = _compute(T, np.array([p - dp, p + dp]), model, branch=branch).G[:, 0]
+    g = oT.G[0]
     g_mix = (oT.G - oT.G_A)[0]
+    S_fd = -(g[1] - g[0]) / (2 * dT)
     S_mix_fd = -(g_mix[1] - g_mix[0]) / (2 * dT)
     V_fd = (gp[1] - gp[0]) / (2 * dp * 1e6)
+    np.testing.assert_allclose(o.S[0, 0], S_fd, rtol=1e-5, atol=1e-4)
     np.testing.assert_allclose(o.S[0, 0] - o.S_A[0, 0], S_mix_fd,
                                rtol=1e-5, atol=1e-4)
     np.testing.assert_allclose(o.V[0, 0], V_fd, rtol=2e-6)
