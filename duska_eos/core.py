@@ -308,55 +308,78 @@ def _dSA_dTh(ph, Th, delta=1e-7):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. Reduced Gibbs energy of state A via numerical integration
+# 9. Reduced Gibbs energy of state A (closed form)
 # ═══════════════════════════════════════════════════════════════════════════
+#
+# The paper defines state A by its volume (compute_VA; Eq. 3 of the paper)
+# and its entropy (compute_SA; Eq. 7 of the paper), not by a Gibbs energy.
+# Both integrate in closed form along a path that starts on the liquid-vapor
+# spinodal of state A, where V_A = V_S and S_A = S_S:
+#
+#   g_A(ph, Th) = g_S(Th) + integral_{pS(Th)}^{ph} V_A(p', Th) dp'
+#               = g_S(Th) - 2 pS VS B [u - B ln(1 + u/B)],  u = sqrt(1 - ph/pS)
+#
+# where g_S is the Gibbs energy on the spinodal.  Along the spinodal,
+# dg = -S dTh + V dp gives
+#
+#   dg_S/dTh = -S_S(Th) + V_S(Th) dpS/dTh,
+#
+# a polynomial in Th plus one logarithm.  With this g_A,
+# (dg_A/dph)_Th = V_A and (dg_A/dTh)_ph = -S_A hold identically, because the
+# entropy expression is the Maxwell relation integrated from the spinodal.
+# The additive constant of g_A is arbitrary; H_OFFSET in params.py fixes it.
+#
+# The expressions hold where the spinodal pressure of state A is negative,
+# T < 597.8 K.  Above that temperature pS > 0, B is imaginary and state A is
+# not defined at low pressure (the paper notes that Speedy's expansion has
+# limited validity at elevated temperature).
 
-# 16-point Gauss-Legendre nodes and weights (precomputed)
-_GL_NODES, _GL_WEIGHTS = np.polynomial.legendre.leggauss(16)
+# dpS/dTh = e0 + e1*Th + e2*Th^2  (Eq. 6a written in powers of Th)
+_DPS_COEF = (float(P.d[0] - 2.0 * P.d[1] + 3.0 * P.d[2]),
+             float(2.0 * P.d[1] - 6.0 * P.d[2]),
+             float(3.0 * P.d[2]))
 
 
-def _compute_g_A_integral(ph, Th):
+def _vs_dps_antiderivative():
+    """Coefficients q_m of integral VS dpS/dTh dTh = sum_m q_m Th^(m+1)."""
+    q = [0.0] * 7
+    for k in range(5):
+        for j in range(3):
+            q[k + j] += float(P.c[k]) * _DPS_COEF[j]
+    return tuple(q[m] / (m + 1.0) for m in range(7))
+
+
+_GS_VP_COEF = _vs_dps_antiderivative()
+
+
+def compute_GS(Th):
+    """Reduced Gibbs energy of state A on its spinodal, up to a constant.
+
+    Antiderivative of dg_S/dTh = -S_S(Th) + V_S(Th) dpS/dTh.  Accepts a
+    scalar or an array.
     """
-    Compute the reduced Gibbs energy of state A via 2D path integral.
+    # integral of VS * dpS/dTh
+    I_VP = 0.0
+    for q in reversed(_GS_VP_COEF):
+        I_VP = I_VP * Th + q
+    I_VP = I_VP * Th
+    # integral of S_S (compute_SS integrated once more)
+    I_SS = (P.s[0] * (Th * np.log(Th) - Th)
+            + Th * Th * (P.s[1] / 2.0
+                         + Th * (P.s[2] / 6.0 + Th * (P.s[3] / 12.0))))
+    return I_VP - I_SS
 
-    The path goes from (ph=0, Th=1) [the VLCP] to (ph, Th) in two legs:
-      Leg 1 (T-leg): (0, 1) -> (0, Th), integrating -SA(0, Th') dTh'
-      Leg 2 (P-leg): (0, Th) -> (ph, Th), integrating VA(ph', Th) dph'
 
-    g_A(ph, Th) = integral_1^{Th} (-SA(0, Th')) dTh'
-                + integral_0^{ph} VA(ph', Th) dph'
+def compute_GA(Th, pS, VS, B, u):
+    """Reduced Gibbs energy of state A, up to a constant (closed form).
 
-    The reference g_A(0, 1) = 0 (arbitrary constant at the VLCP).
-    Uses 16-point Gauss-Legendre quadrature for both legs.
+    g_A = g_S(Th) - 2 pS VS B [u - B ln(1 + u/B)], with u = sqrt(1 - ph/pS)
+    as returned by compute_VA.  NaN below the spinodal, where u is NaN.
+    Accepts scalars or arrays.
     """
-    # -- Leg 1: T-integral from Th=1 to Th at ph=0 -------------------------
-    g_T_leg = 0.0
-    dTh_val = Th - 1.0
-    if abs(dTh_val) > 1e-30:
-        half_dTh = dTh_val / 2.0
-        for node, weight in zip(_GL_NODES, _GL_WEIGHTS):
-            Th_i = half_dTh * (node + 1.0) + 1.0
-            pS_i, VS_i, phi_i, dpS_i, dVS_i, dphi_i = spinodal_props(Th_i)
-            B_i, dB_i = compute_B(pS_i, VS_i, phi_i, dpS_i, dVS_i, dphi_i)
-            VA_i, _, _ = compute_VA(0.0, pS_i, VS_i, B_i)
-            SA_i = compute_SA(VA_i, VS_i, Th_i, dpS_i, B_i, dB_i,
-                              pS_i, dVS_i, dphi_i)
-            g_T_leg += weight * (-SA_i)
-        g_T_leg *= half_dTh
-
-    # -- Leg 2: P-integral from ph=0 to ph at fixed Th ---------------------
-    g_P_leg = 0.0
-    if abs(ph) > 1e-30:
-        pS, VS, phi, dpS, dVS, dphi = spinodal_props(Th)
-        B, dB = compute_B(pS, VS, phi, dpS, dVS, dphi)
-        half_ph = ph / 2.0
-        for node, weight in zip(_GL_NODES, _GL_WEIGHTS):
-            ph_i = half_ph * (node + 1.0)
-            VA_i, _, _ = compute_VA(ph_i, pS, VS, B)
-            g_P_leg += weight * VA_i
-        g_P_leg *= half_ph
-
-    return g_T_leg + g_P_leg
+    with np.errstate(divide='ignore', invalid='ignore'):
+        z = np.divide(u, B)
+        return compute_GS(Th) - 2.0 * pS * VS * B * (u - B * np.log1p(z))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -526,7 +549,7 @@ def compute_properties(T_K, p_MPa, _compute_Kp=False):
     dSh_dT = dSh_dT_x + dShdx * dx_dTh
 
     # ── Reduced Gibbs energies for G computation ─────────────────────────
-    g_A = _compute_g_A_integral(ph, Th)
+    g_A = float(compute_GA(Th, pS, VS, B, u))
     g_mix = g_A + x * DG + Th * mix_entropy + om * x * (1.0 - x)
     g_B = g_A + DG
 
@@ -654,7 +677,7 @@ def compute_properties_at_x(T_K, p_MPa, x, _compute_Kp=False):
     dSh_dT = dSh_dT_x + dShdx * dx_dTh
 
     # Reduced Gibbs energy at forced x
-    g_A = _compute_g_A_integral(ph, Th)
+    g_A = float(compute_GA(Th, pS, VS, B, u))
     g_mix = g_A + x * DG + Th * mix_entropy + om * x * (1.0 - x)
 
     props = _pure_state_props(Vh, Sh, dVh_dp, dVh_dT, dSh_dT, Th, ph, g_mix)
@@ -916,33 +939,8 @@ def compute_batch(T_K, p_MPa, branch='stable'):
         0.0)
     dSh_dT = dSh_dT_x + dShdx * dx_dTh
 
-    # ── (n) Gibbs energy via Gauss-Legendre integral ────────────────────
-    nodes, weights = _GL_NODES, _GL_WEIGHTS
-
-    # Leg 1: T-integral from Th=1 to Th at ph=0
-    g_T_leg = np.zeros(n)
-    dTh_val = Th - 1.0
-    half_dTh = dTh_val / 2.0
-    for node, weight in zip(nodes, weights):
-        Th_i = half_dTh * (node + 1.0) + 1.0
-        SA_i = _SA_vec(np.zeros(n), Th_i)
-        g_T_leg += weight * (-SA_i)
-    g_T_leg *= half_dTh
-
-    # Leg 2: P-integral from ph=0 to ph at fixed Th
-    # pS, VS, B at fixed Th are already computed
-    g_P_leg = np.zeros(n)
-    half_ph = ph / 2.0
-    for node, weight in zip(nodes, weights):
-        ph_i = half_ph * (node + 1.0)
-        with np.errstate(invalid='ignore'):
-            arg_u_i = 1.0 - ph_i / pS
-            u_i = np.sqrt(np.where(arg_u_i >= 0.0, arg_u_i, np.nan))
-        VA_i = VS * B / (u_i + B)
-        g_P_leg += weight * VA_i
-    g_P_leg *= half_ph
-
-    g_A = g_T_leg + g_P_leg
+    # ── (n) Gibbs energy of state A (closed form, see section 9) ────────
+    g_A = compute_GA(Th, pS, VS, B, u)
 
     # ── (o) Reduced Gibbs energies ──────────────────────────────────────
     g_mix = g_A + x * DG + Th * mix_entropy + om * x * (1.0 - x)

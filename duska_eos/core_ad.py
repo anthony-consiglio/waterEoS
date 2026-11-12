@@ -9,8 +9,8 @@ Falls back to hand-coded core.py when JAX is not installed.
 The total reduced Gibbs energy of mixing is:
     g_mix = g_A(ph, Th) + x*DG + Th*[x*ln(x) + (1-x)*ln(1-x)] + omega*x*(1-x)
 
-where g_A is computed via Gauss-Legendre path integral, DG is a polynomial,
-and omega depends on both Th and ph.
+where g_A is the closed-form Gibbs energy of state A (see core.py), DG is a
+polynomial, and omega depends on both Th and ph.
 
 Reduced variables: Th = T/T_VLCP, ph = P/p_VLCP
 """
@@ -20,16 +20,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import params as P
+from .core import _GS_VP_COEF
 from watereos_ad.equilibrium import make_equilibrium_solver
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 0. Gauss-Legendre nodes/weights (precomputed, 16 points)
-# ═══════════════════════════════════════════════════════════════════════════
-
-_GL_NODES_NP, _GL_WEIGHTS_NP = np.polynomial.legendre.leggauss(16)
-_GL_NODES = jnp.array(_GL_NODES_NP)
-_GL_WEIGHTS = jnp.array(_GL_WEIGHTS_NP)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -147,50 +139,47 @@ def _SA(ph, Th):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. Gibbs energy of state A via path integral
+# 5. Gibbs energy of state A (closed form)
 # ═══════════════════════════════════════════════════════════════════════════
+
+def _GS(Th):
+    """Reduced Gibbs energy of state A on its spinodal, up to a constant.
+
+    Antiderivative of dg_S/dTh = -S_S(Th) + V_S(Th) dpS/dTh (see core.py).
+    """
+    # integral of VS * dpS/dTh
+    I_VP = 0.0
+    for q in reversed(_GS_VP_COEF):
+        I_VP = I_VP * Th + q
+    I_VP = I_VP * Th
+    # integral of S_S
+    I_SS = (P.s[0] * (Th * jnp.log(Th) - Th)
+            + Th * Th * (P.s[1] / 2.0
+                         + Th * (P.s[2] / 6.0 + Th * (P.s[3] / 12.0))))
+    return I_VP - I_SS
+
 
 @jax.custom_jvp
 def _g_A(ph, Th):
     """
-    Reduced Gibbs energy of state A via 2D path integral.
+    Reduced Gibbs energy of state A, up to a constant (closed form).
 
-    Leg 1: (0, 1) -> (0, Th), integrating -SA(0, Th') dTh'
-    Leg 2: (0, Th) -> (ph, Th), integrating VA(ph', Th) dph'
+    g_A = g_S(Th) - 2 pS VS B [u - B ln(1 + u/B)],  u = sqrt(1 - ph/pS),
+    the integral of VA over pressure from the spinodal of state A, where
+    g_A = g_S (see core.py, section 9, for the derivation).
 
-    Uses custom_jvp to provide exact analytical derivatives:
-      dg_A/dph = VA(ph, Th)     (exact, not quadrature-limited)
-      dg_A/dTh = -SA(ph, Th)   (exact, not quadrature-limited)
-
-    This avoids quadrature error in the derivatives while keeping
-    the integral for the Gibbs energy value itself.
+    The derivatives are supplied through custom_jvp as the model's own
+    expressions,
+      dg_A/dph = VA(ph, Th)
+      dg_A/dTh = -SA(ph, Th)
+    which the closed form satisfies identically; this keeps every derived
+    property on the same expressions as the hand-coded backend.
     """
-    # Leg 1: T-integral from Th=1 to Th at ph=0
-    dTh_val = Th - 1.0
-    half_dTh = dTh_val / 2.0
-
-    def T_integrand(i, acc):
-        node = _GL_NODES[i]
-        weight = _GL_WEIGHTS[i]
-        Th_i = half_dTh * (node + 1.0) + 1.0
-        SA_i = _SA(0.0, Th_i)
-        return acc + weight * (-SA_i)
-
-    g_T_leg = jax.lax.fori_loop(0, 16, T_integrand, 0.0) * half_dTh
-
-    # Leg 2: P-integral from ph=0 to ph at fixed Th
-    half_ph = ph / 2.0
-
-    def P_integrand(i, acc):
-        node = _GL_NODES[i]
-        weight = _GL_WEIGHTS[i]
-        ph_i = half_ph * (node + 1.0)
-        VA_i = _VA(ph_i, Th)
-        return acc + weight * VA_i
-
-    g_P_leg = jax.lax.fori_loop(0, 16, P_integrand, 0.0) * half_ph
-
-    return g_T_leg + g_P_leg
+    pS = _pS(Th)
+    VS = _VS(Th)
+    B = _B_param(Th)
+    u = jnp.sqrt(jnp.maximum(1.0 - ph / pS, 1e-30))
+    return _GS(Th) - 2.0 * pS * VS * B * (u - B * jnp.log1p(u / B))
 
 
 @_g_A.defjvp
@@ -204,11 +193,9 @@ def _g_A_jvp(primals, tangents):
     # Exact derivatives from thermodynamic identities:
     #   dg_A/dph = VA(ph, Th)
     #   dg_A/dTh = -SA(ph, Th)
-    # These are computed from the analytical SA/VA functions, avoiding
-    # the quadrature error that would come from differentiating through
-    # the Gauss-Legendre integral. Higher-order derivatives (d²g_A/dTh²
-    # etc.) are obtained by JAX differentiating through SA and VA, which
-    # are fully analytical.
+    # These are computed from the analytical SA/VA functions. Higher-order
+    # derivatives (d²g_A/dTh² etc.) are obtained by JAX differentiating
+    # through SA and VA, which are fully analytical.
     VA_val = _VA(ph, Th)
     SA_val = _SA(ph, Th)
 

@@ -96,13 +96,21 @@ S_A = dpS*(V_A - V_S) + A_coeff*(...) + C_coeff*(...) + S_S
 
 where `A_coeff` and `C_coeff` are combinations of spinodal derivatives, and `S_S` is computed from a polynomial (Eq. 25).
 
-### Gibbs energy of state A (numerical integration)
+### Gibbs energy of state A (closed form)
 
-The Gibbs energy `G_A` is obtained via 2D path integration from the VLCP `(p_hat=0, T_hat=1)` to `(p_hat, T_hat)` using 16-point Gauss-Legendre quadrature:
+The paper defines state A through `V_A` and `S_A` and does not give its Gibbs energy. Both integrate in closed form along a path that starts on the spinodal of state A, where `V_A = V_S` and `S_A = S_S`:
 
 ```
-g_A = integral_1^{T_hat} (-S_A(0, T')) dT' + integral_0^{p_hat} V_A(p', T_hat) dp'
+g_A = g_S(T_hat) - 2 * p_S * V_S * B * [u - B * ln(1 + u/B)]
 ```
+
+The second term is the integral of `V_A` over pressure from `p_S(T_hat)` to `p_hat`. `g_S` is the Gibbs energy on the spinodal, which follows from `dg = -S dT + V dp` along it:
+
+```
+dg_S/dT_hat = -S_S(T_hat) + V_S(T_hat) * dp_S/dT_hat
+```
+
+This is a polynomial in `T_hat` plus one logarithm, so `g_S` is elementary. With this `g_A`, `V_A = dg_A/dp_hat` and `S_A = -dg_A/dT_hat` hold identically, and so do `V = dG/dP` and `S = -dG/dT` for the mixture and for state B. The additive constant of `g_A` is fixed by the reference-state alignment (`H_OFFSET` in `params.py`).
 
 ### Gibbs difference G^B - G^A (Eq. 5)
 
@@ -166,7 +174,7 @@ State A and state B properties are also available with `_A` and `_B` suffixes.
 ## Implementation Notes
 
 - **`params.py`** — All 28 parameters with corrections for coefficient ordering (confirmed against the author's MATLAB implementation).
-- **`core.py`** — Scalar (`compute_properties`) and vectorized (`compute_batch`) computation. Uses finite-difference for `dS_A/dT_hat` and Gauss-Legendre quadrature for `G_A`.
+- **`core.py`** — Scalar (`compute_properties`) and vectorized (`compute_batch`) computation. Uses finite-difference for `dS_A/dT_hat` and the closed form above for `G_A`.
 - **`core_ad.py`** — JAX-based autodiff version (avoids finite differences entirely).
 - **`phase_diagram.py`** — Spinodal and binodal curves.
 - **Reference state:** Aligned to IAPWS-95 at T = 273.15 K, P = 0.1 MPa.

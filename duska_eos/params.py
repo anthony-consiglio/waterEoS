@@ -87,6 +87,8 @@ s = np.array([
 # Offsets calibrated at T_ref=273.15 K, P_ref=0.1 MPa so that
 # S_aligned = S_raw + S_OFFSET matches IAPWS-95 entropy,
 # G_aligned = G_raw + H_OFFSET - T * S_OFFSET matches IAPWS-95 Gibbs.
+# G_raw is the closed-form Gibbs energy of core.compute_GA, whose additive
+# constant is arbitrary; H_OFFSET absorbs it.
 T_REF = 273.15                     # K
 S_OFFSET = -13463.3332601599       # J/(kg·K)
-H_OFFSET = -9540603.2122842800     # J/kg
+H_OFFSET = -1322279.5452823788     # J/kg
