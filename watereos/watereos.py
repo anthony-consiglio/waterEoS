@@ -23,11 +23,19 @@ import numpy as np
 
 from watereos._common import _is_grid_input
 from watereos.model_registry import MODEL_REGISTRY
+from watereos.two_state_branch import normalize_branch
 
 _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
            'duska2020', 'grenke2025', 'singh2017',
            'singh2017_caupin2019', 'singh2017_duska2020',
            'shi_tanaka2020', 'shi_tanaka2020_transport']
+
+# Models whose liquid can be followed on a named branch (regular-mixture
+# two-state EoS, and the transport model built on them)
+_BRANCH_MODELS = frozenset([
+    'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
+    'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
+])
 
 # Case-insensitive lookup  ->  canonical name
 _CANONICAL = {name.lower(): name for name in _MODELS}
@@ -112,7 +120,7 @@ def list_models():
     return list(_MODELS)
 
 
-def getProp(PT, model):
+def getProp(PT, model, branch='stable'):
     """Compute thermodynamic properties for water.
 
     Parameters
@@ -135,14 +143,31 @@ def getProp(PT, model):
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
         'singh2017_caupin2019', 'singh2017_duska2020'.
         Matching is case-insensitive.
+    branch : {'stable', 'hdl', 'ldl'}, optional
+        Below the liquid-liquid critical point the two-state models have
+        two liquid states over part of the (T, P) plane.  ``'stable'``
+        (default) returns the one with the lowest Gibbs energy, which
+        jumps at the liquid-liquid transition.  ``'hdl'`` returns the
+        high-density liquid (low-density fraction x <= 1/2) and
+        ``'ldl'`` the low-density liquid (x >= 1/2) wherever that liquid
+        exists, including its metastable range between the transition
+        and its spinodal, and NaN elsewhere.  Following ``'hdl'`` on
+        cooling at a pressure above the critical pressure therefore
+        gives the smooth metastable extension of the liquid through
+        the transition.
+        Supported by 'holten2014', 'caupin2019', 'caupin2019_kim',
+        'duska2020' and the 'singh2017*' transport models.
 
     Returns
     -------
     out : object
         Result object whose attributes (``rho``, ``Cp``, ``vel``, etc.) depend
-        on the chosen backend.
+        on the chosen backend.  With ``branch='hdl'`` or ``'ldl'`` it also
+        has ``metastable``, a bool array that is True where the returned
+        state is not the one with the lowest Gibbs energy.
     """
     PT = _validate_PT(PT)
+    branch = normalize_branch(branch)
 
     canonical = _CANONICAL.get(model.lower())
     if canonical is not None:
@@ -150,6 +175,12 @@ def getProp(PT, model):
     if canonical is None:
         raise ValueError(
             f"Unknown model '{model}'. Choose from: {', '.join(_MODELS)}"
+        )
+    if branch != 'stable' and canonical not in _BRANCH_MODELS:
+        raise ValueError(
+            f"branch='{branch}' is not available for model '{canonical}'. "
+            f"Models with branch selection: "
+            f"{', '.join(m for m in _MODELS if m in _BRANCH_MODELS)}"
         )
 
     if canonical == 'water1':
@@ -162,19 +193,19 @@ def getProp(PT, model):
 
     if canonical == 'holten2014':
         from holten_eos import getProp as _gp
-        return _gp(PT)
+        return _gp(PT, branch=branch)
 
     if canonical == 'caupin2019':
         from caupin_eos import getProp as _gp
-        return _gp(PT)
+        return _gp(PT, branch=branch)
 
     if canonical == 'caupin2019_kim':
         from caupin_eos import getProp_kim as _gp
-        return _gp(PT)
+        return _gp(PT, branch=branch)
 
     if canonical == 'duska2020':
         from duska_eos import getProp as _gp
-        return _gp(PT)
+        return _gp(PT, branch=branch)
 
     if canonical == 'grenke2025':
         from grenke_eos import getProp as _gp
@@ -182,15 +213,15 @@ def getProp(PT, model):
 
     if canonical == 'singh2017':
         from singh_viscosity import getProp as _gp
-        return _gp(PT)
+        return _gp(PT, branch=branch)
 
     if canonical == 'singh2017_caupin2019':
         from singh_viscosity import getProp as _gp
-        return _gp(PT, backbone='caupin2019')
+        return _gp(PT, backbone='caupin2019', branch=branch)
 
     if canonical == 'singh2017_duska2020':
         from singh_viscosity import getProp as _gp
-        return _gp(PT, backbone='duska2020')
+        return _gp(PT, backbone='duska2020', branch=branch)
 
     if canonical == 'shi_tanaka2020':
         from shi_tanaka_eos import getProp as _gp
@@ -201,7 +232,7 @@ def getProp(PT, model):
         return _gp(PT)
 
 
-def compute(T_K, P_MPa, model):
+def compute(T_K, P_MPa, model, branch='stable'):
     """Compute thermodynamic properties for water.
 
     A simpler alternative to getProp() — pass T and P directly
@@ -219,6 +250,8 @@ def compute(T_K, P_MPa, model):
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
         'singh2017_caupin2019', 'singh2017_duska2020'.
         Matching is case-insensitive.
+    branch : {'stable', 'hdl', 'ldl'}, optional
+        Liquid branch of a two-state model; see ``getProp``.
 
     Returns
     -------
@@ -227,4 +260,4 @@ def compute(T_K, P_MPa, model):
         on the chosen backend.
     """
     PT = np.array([np.atleast_1d(P_MPa), np.atleast_1d(T_K)], dtype=object)
-    return getProp(PT, model)
+    return getProp(PT, model, branch=branch)

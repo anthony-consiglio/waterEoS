@@ -18,6 +18,8 @@ Reference: V. Holten, J. V. Sengers, M. A. Anisimov,
 import math
 import numpy as np
 from . import params as P
+from watereos.two_state_branch import (
+    normalize_branch, select_branch, mask_mixture)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -588,7 +590,7 @@ def _solve_xe_vec(L, omega):
     return x
 
 
-def compute_batch(T_K, p_MPa):
+def compute_batch(T_K, p_MPa, branch='stable'):
     """
     Vectorized computation of all thermodynamic properties.
 
@@ -596,6 +598,10 @@ def compute_batch(T_K, p_MPa):
     ----------
     T_K   : 1-D array — temperature in K
     p_MPa : 1-D array — pressure in MPa  (same length as T_K)
+    branch : str — which liquid state to return: 'stable' (default,
+            lowest Gibbs energy), 'hdl' (minimum with x <= 1/2) or
+            'ldl' (minimum with x >= 1/2). See
+            watereos.two_state_branch.
 
     Returns
     -------
@@ -604,7 +610,12 @@ def compute_batch(T_K, p_MPa):
         rho_A, V_A, ..., vel_A, G_A, H_A, U_A, A_A,
         rho_B, V_B, ..., vel_B, G_B, H_B, U_B, A_B
     (Kp, Kp_A, Kp_B are NOT included — too expensive for batch.)
+    With branch 'hdl' or 'ldl' the dict also holds 'metastable' (bool
+    array, True where the returned state is a local minimum that is not
+    the lowest one), and the mixture properties are NaN where the
+    requested branch does not exist.
     """
+    branch = normalize_branch(branch)
     T_K = np.asarray(T_K, dtype=float)
     p_MPa = np.asarray(p_MPa, dtype=float)
 
@@ -625,7 +636,10 @@ def compute_batch(T_K, p_MPa):
     omega = 2.0 + P.omega0 * p_red
 
     # ── Equilibrium x ────────────────────────────────────────────────
-    x = _solve_xe_vec(L, omega)
+    if branch == 'stable':
+        x = _solve_xe_vec(L, omega)
+    else:
+        x, metastable = select_branch(L, omega, branch)
 
     # ── Mixture properties (phi/chi formulation) ─────────────────────
     f = 2.0 * x - 1.0
@@ -739,4 +753,7 @@ def compute_batch(T_K, p_MPa):
         'U_B': U_B, 'A_B': A_pot_B, 'Cp_B': Cp_B, 'Cv_B': Cv_B,
         'Kt_B': Kt_B, 'Ks_B': Ks_B, 'alpha_B': Alp_B, 'vel_B': vel_B,
     }
+    if branch != 'stable':
+        result['metastable'] = metastable
+        mask_mixture(result, x)
     return result

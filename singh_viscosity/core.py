@@ -112,7 +112,7 @@ def compute_properties(T_K, p_MPa, backbone=DEFAULT_BACKBONE):
     return {'eta': tr['eta'], 'D': tr['D'], 'tau_r': tr['tau_r'], 'f': f}
 
 
-def compute_batch(T_K, p_MPa, backbone=DEFAULT_BACKBONE):
+def compute_batch(T_K, p_MPa, backbone=DEFAULT_BACKBONE, branch='stable'):
     """
     Vectorized computation of transport + thermodynamic properties.
 
@@ -124,6 +124,9 @@ def compute_batch(T_K, p_MPa, backbone=DEFAULT_BACKBONE):
     T_K      : 1-D array — temperature in K
     p_MPa    : 1-D array — pressure in MPa (same length as T_K)
     backbone : str — 'holten2014' (default), 'caupin2019', or 'duska2020'
+    branch   : str — branch of the backbone EoS that supplies the LDS
+               fraction: 'stable' (default), 'hdl' or 'ldl'
+               (see watereos.two_state_branch)
 
     Returns
     -------
@@ -140,7 +143,7 @@ def compute_batch(T_K, p_MPa, backbone=DEFAULT_BACKBONE):
     p_MPa = np.asarray(p_MPa, dtype=float)
 
     # Get all thermodynamic properties + LDS fraction from the backbone
-    thermo = _backbone_compute_batch(backbone)(T_K, p_MPa)
+    thermo = _backbone_compute_batch(backbone)(T_K, p_MPa, branch=branch)
     f = thermo['x']
 
     tr = _transport_from_fraction(T_K, f, p_MPa * 1e6, pset)

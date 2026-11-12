@@ -47,7 +47,7 @@ _BATCH_KEYS = (
 _BATCH_KEYS = list(dict.fromkeys(_BATCH_KEYS))
 
 
-def getProp(PT, phase=None, backbone='holten2014'):
+def getProp(PT, phase=None, backbone='holten2014', branch='stable'):
     """
     Compute transport and thermodynamic properties.
 
@@ -62,6 +62,10 @@ def getProp(PT, phase=None, backbone='holten2014'):
         Two-state EoS supplying the LDS fraction: 'holten2014' (default,
         published parameters), 'caupin2019' or 'duska2020' (parameters
         refitted in this repo against the original experimental datasets).
+    branch : {'stable', 'hdl', 'ldl'}, optional
+        Branch of the backbone EoS that supplies the LDS fraction and the
+        thermodynamic properties (see ``watereos.two_state_branch``).
+        With ``'hdl'`` or ``'ldl'`` the output also has ``metastable``.
 
     Returns
     -------
@@ -83,9 +87,10 @@ def getProp(PT, phase=None, backbone='holten2014'):
         T_flat = T_grid.ravel()
         P_flat = P_grid.ravel()
 
-        batch = compute_batch(T_flat, P_flat, backbone=backbone)
+        batch = compute_batch(T_flat, P_flat, backbone=backbone,
+                              branch=branch)
 
-        for k in _BATCH_KEYS:
+        for k in _BATCH_KEYS + ['metastable']:
             if k in batch:
                 setattr(out, k, batch[k].reshape(nP, nT))
 
@@ -99,9 +104,10 @@ def getProp(PT, phase=None, backbone='holten2014'):
         P_flat = pairs[:, 0]
         T_flat = pairs[:, 1]
 
-        batch = compute_batch(T_flat, P_flat, backbone=backbone)
+        batch = compute_batch(T_flat, P_flat, backbone=backbone,
+                              branch=branch)
 
-        for k in _BATCH_KEYS:
+        for k in _BATCH_KEYS + ['metastable']:
             if k in batch:
                 setattr(out, k, batch[k])
 
