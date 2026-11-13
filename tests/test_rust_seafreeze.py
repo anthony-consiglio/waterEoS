@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import scipy
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -82,6 +83,43 @@ def _props_for(phase: str) -> list[str]:
     return PROPS_FLUID if phase in fluids else PROPS_SOLID
 
 
+# The reference evaluates its splines with ``scipy.interpolate.splev``.
+# Before SciPy 1.18, which replaced the Fortran FITPACK with a C port,
+# ``splev(..., der=1)`` returns a wrong first derivative for splines of
+# degree 7 (checked on SciPy 1.13.1 to 1.17.1 against
+# ``BSpline.derivative`` and against finite differences; degree 5 and the
+# second derivative are not affected). The ice V and ice VI splines are
+# degree 7 in T, so on those SciPy versions the reference entropy and
+# thermal expansivity of the two phases are wrong (ice V entropy by up to
+# 0.3 %, against a finite difference of the reference's own Gibbs energy)
+# and there is nothing valid to compare with. SciPy 1.18 needs Python 3.12.
+DEGREE_7_PHASES = {"V", "VI"}
+SCIPY_VERSION = tuple(int(part) for part in scipy.__version__.split(".")[:2])
+
+
+def _skip_if_reference_unreliable(phase: str) -> None:
+    if phase in DEGREE_7_PHASES and SCIPY_VERSION < (1, 18):
+        pytest.skip(
+            f"ice {phase}: the SeaFreeze reference differentiates this spline "
+            f"incorrectly with SciPy {scipy.__version__}; needs SciPy >= 1.18"
+        )
+
+
+def _reference(ref, key: str) -> np.ndarray:
+    """Reference value of ``key`` from a SeaFreeze ``getProp`` result.
+
+    SeaFreeze 1.1.0 stopped returning the specific volume ``V`` from the
+    all-properties call (1.0.0 and earlier included it), to match the output
+    of the Matlab ``SF_getprop``. The reference defines it as the reciprocal
+    of its density (``lbftd.statevars.evalVolume``: ``V = rho ** -1``), so
+    when ``V`` is absent the same quantity is rebuilt from the reference
+    ``rho`` and the comparison is the one made against older releases.
+    """
+    if key == "V" and not hasattr(ref, "V"):
+        return 1.0 / np.asarray(ref.rho, dtype=float)
+    return np.asarray(getattr(ref, key))
+
+
 def _close(a: np.ndarray, b: np.ndarray, *, label: str) -> None:
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
@@ -103,6 +141,7 @@ def _close(a: np.ndarray, b: np.ndarray, *, label: str) -> None:
 
 @pytest.mark.parametrize("phase", list(PHASES.keys()))
 def test_grid_matches_reference(phase: str) -> None:
+    _skip_if_reference_unreliable(phase)
     (p_lo, p_hi, n_p), (t_lo, t_hi, n_t) = PHASES[phase]
     P = np.linspace(p_lo, p_hi, n_p)
     T = np.linspace(t_lo, t_hi, n_t)
@@ -114,7 +153,7 @@ def test_grid_matches_reference(phase: str) -> None:
 
     for key in _props_for(phase):
         rust_val = np.asarray(rust[key])
-        ref_val = np.asarray(getattr(ref, key))
+        ref_val = _reference(ref, key)
         _close(rust_val, ref_val, label=f"{phase}/{key} (grid)")
 
 
@@ -124,6 +163,7 @@ def test_grid_matches_reference(phase: str) -> None:
 
 @pytest.mark.parametrize("phase", list(PHASES.keys()))
 def test_scatter_matches_reference(phase: str) -> None:
+    _skip_if_reference_unreliable(phase)
     (p_lo, p_hi, _), (t_lo, t_hi, _) = PHASES[phase]
     rng = np.random.default_rng(seed=hash(phase) & 0xFFFF_FFFF)
     n = 24
@@ -138,7 +178,7 @@ def test_scatter_matches_reference(phase: str) -> None:
 
     for key in _props_for(phase):
         rust_val = np.asarray(rust[key]).ravel()
-        ref_val = np.asarray(getattr(ref, key)).ravel()
+        ref_val = _reference(ref, key).ravel()
         _close(rust_val, ref_val, label=f"{phase}/{key} (scatter)")
 
 
