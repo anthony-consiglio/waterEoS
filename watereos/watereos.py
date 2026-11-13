@@ -15,6 +15,7 @@ Provides a single ``getProp(PT, model)`` interface that dispatches to:
   - ``'singh2017'``      -- Singh, Issenmann & Caupin (2017) transport
   - ``'singh2017_caupin2019'`` -- same, refit with the Caupin (2019) backbone
   - ``'singh2017_duska2020'``  -- same, refit with the Duska (2020) backbone
+  - ``'vapor'``          -- water vapor (IAPWS-95 ideal gas + virial terms)
 """
 
 import warnings
@@ -28,7 +29,7 @@ from watereos.two_state_branch import normalize_branch
 _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
            'duska2020', 'grenke2025', 'singh2017',
            'singh2017_caupin2019', 'singh2017_duska2020',
-           'shi_tanaka2020', 'shi_tanaka2020_transport']
+           'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor']
 
 # Models whose liquid can be followed on a named branch (regular-mixture
 # two-state EoS, and the transport model built on them)
@@ -141,7 +142,7 @@ def getProp(PT, model, branch='stable'):
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
         'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
-        'singh2017_caupin2019', 'singh2017_duska2020'.
+        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor'.
         Matching is case-insensitive.
     branch : {'stable', 'hdl', 'ldl'}, optional
         Below the liquid-liquid critical point the two-state models have
@@ -231,6 +232,10 @@ def getProp(PT, model, branch='stable'):
         from shi_tanaka_transport import getProp as _gp
         return _gp(PT)
 
+    if canonical == 'vapor':
+        from vapor_eos import getProp as _gp
+        return _gp(PT)
+
 
 def compute(T_K, P_MPa, model, branch='stable'):
     """Compute thermodynamic properties for water.
@@ -248,7 +253,7 @@ def compute(T_K, P_MPa, model, branch='stable'):
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
         'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
-        'singh2017_caupin2019', 'singh2017_duska2020'.
+        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor'.
         Matching is case-insensitive.
     branch : {'stable', 'hdl', 'ldl'}, optional
         Liquid branch of a two-state model; see ``getProp``.

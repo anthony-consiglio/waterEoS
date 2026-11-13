@@ -30,6 +30,7 @@ All four return 43 thermodynamic properties: 15 mixture properties, 14 per state
 - **Shi & Tanaka (2020) transport** -- A companion transport model (`shi_tanaka2020_transport`) for viscosity, self-diffusion, and rotational relaxation, coupled to the same hierarchical two-state framework as `shi_tanaka2020` rather than to Holten. Returns all `shi_tanaka2020` thermodynamic outputs plus `eta`, `D`, and `tau_r`.
 - **SeaFreeze `water1`** -- A pass-through to SeaFreeze's GLBF tensor-product B-spline representation of liquid water (Journaux et al., 2020). Valid 240&ndash;501 K, 0&ndash;2300 MPa.
 - **IAPWS-95** -- A pass-through to the IAPWS-95 reference equation of state for ordinary water (Wagner & Pruß, 2002), accessed via the same SeaFreeze GLBF spline machinery. Provides the canonical reference values that the supercooled-water models above are aligned to.
+- **Water vapor** -- The vapor phase (`vapor`) as a Gibbs function of temperature and pressure: the IAPWS-95 ideal gas with the second and third virial coefficients of the IAPWS-95 residual part. It is on the same reference state as the liquids and the SeaFreeze ices, so equating Gibbs energies gives sublimation and saturation pressures. See [Water Vapor](#water-vapor).
 
 ## Web App
 
@@ -108,6 +109,7 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'singh2017'` | Singh, Issenmann & Caupin, PNAS **114**, 4312 (2017) | -- (transport) |
 | `'water1'` | SeaFreeze water1 (pass-through) | -- |
 | `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- |
+| `'vapor'` | Water vapor: IAPWS-95 ideal gas + second and third virial terms (Wagner & Pruß, 2002) | -- (vapor) |
 
 ### Validity Ranges
 
@@ -125,6 +127,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'water1'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 | `'singh2017'` | 244&ndash;298 K (limited by homogeneous ice nucleation) | Unbounded (any T, P) |
 | `'IAPWS95'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
+| `'vapor'` | 130&ndash;400 K, from zero pressure to saturation / sublimation and moderately beyond (0.25 MPa at 400 K) | Any T, P > 0; NaN where the virial series has no meaning (far beyond saturation) |
 
 **Notes:**
 - T_H(P) is the homogeneous ice nucleation temperature (~235 K at 0.1 MPa, ~181 K at 200 MPa).
@@ -256,6 +259,7 @@ from caupin_eos import getProp
 from holten_eos import getProp
 from grenke_eos import getProp
 from singh_viscosity import getProp
+from vapor_eos import getProp
 ```
 
 ### List Available Models
@@ -264,7 +268,8 @@ from singh_viscosity import getProp
 from watereos import list_models
 print(list_models())
 # ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
-#  'grenke2025', 'singh2017', 'shi_tanaka2020', 'shi_tanaka2020_transport']
+#  'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
+#  'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor']
 ```
 
 ## Output Properties
@@ -381,7 +386,49 @@ fig_3d  = plot_ptv_phase_diagram_plotly(diagram, V_min=7e-4, V_max=1.1e-3,
                                          P_max=1000)
 ```
 
-The diagram is built by isothermal convex-hull sweeps in (V, A) space across the SeaFreeze ice phases, `water1`, and an ideal-gas vapor branch anchored at IAPWS-95 saturation. Each common-tangent point is then Newton-refined to the exact analytical condition G<sub>A</sub>(T, P) = G<sub>B</sub>(T, P), so the boundary curves are smooth and free of EoS-discretisation kinks. Three-phase invariants (triple points) are detected from topology changes between adjacent T-slices and rendered as 3-phase coexistence lines.
+The diagram is built by isothermal convex-hull sweeps in (V, A) space across the SeaFreeze ice phases, `water1`, and the vapor (the `vapor` model below, sampled from its coexistence pressure with ice Ih or with the liquid downward). Each common-tangent point is then Newton-refined to the exact analytical condition G<sub>A</sub>(T, P) = G<sub>B</sub>(T, P), so the boundary curves are smooth and free of EoS-discretization kinks. Three-phase invariants (triple points) are detected from topology changes between adjacent T-slices and rendered as 3-phase coexistence lines.
+
+## Water Vapor
+
+`'vapor'` is water vapor as a Gibbs function of (T, P), built from IAPWS-95: its ideal-gas part, which gives the correct heat capacity and carries the reference state, plus the second and third virial coefficients that follow from its residual part. The density series is reverted to pressure, so the model is explicit in (T, P) and every property is an analytic derivative of one function. Details and derivation: [`vapor_eos/README.md`](vapor_eos/README.md).
+
+The vapor is evaluated like any other model, and by phase name wherever the ices are:
+
+```python
+import numpy as np
+from watereos import compute
+from watereos._seafreeze_native import getProp_scatter
+from vapor_eos import compute_batch, vapor_pressure
+
+out = compute(T_K=[250.0, 273.16, 300.0], P_MPa=[1e-5, 6e-4], model='vapor')
+
+P = np.array([1e-4, 6.11657e-4])              # MPa
+T = np.array([250.0, 273.16])                 # K
+vap = getProp_scatter('vapor', P, T)          # same call as for an ice
+ice = getProp_scatter('Ih', P, T)
+vap.G - ice.G                                 # J/kg, same reference state
+
+out = compute_batch(T, P)                     # dict: G, V, S, ... (T first)
+
+vapor_pressure(253.15, 'Ih')                  # 1.0324e-4 MPa, ice Ih
+vapor_pressure(253.15, 'holten2014')          # 1.2546e-4 MPa, supercooled water
+```
+
+`vapor_pressure(T, phase)` returns the pressure at which the vapor and a condensed phase have the same Gibbs energy. Because all phases share the IAPWS-95 reference state, this reproduces the IAPWS vapor pressures without any anchoring:
+
+| Condensed phase | Range | Largest deviation of the vapor pressure |
+|-----------------|-------|------------------------------------------|
+| Ice Ih (SeaFreeze) vs. IAPWS R14-08 sublimation pressure | 190&ndash;273.16 K | 0.010 % |
+| `'IAPWS95'`, `'water1'`, `'duska2020'` vs. IAPWS-95 saturation pressure | 273.16&ndash;373.15 K | 0.003 % |
+| `'holten2014'`, `'caupin2019'`, `'caupin2019_kim'` | 273.16&ndash;300 K | 0.002 % |
+| `'grenke2025'` | 273.16&ndash;300 K | 0.004 % |
+| `'holten2014'`, supercooled, vs. Murphy & Koop (2005) | 233.15&ndash;263.15 K | 0.19 % |
+
+`shi_tanaka2020` is not aligned to the IAPWS-95 reference state, so its Gibbs energy cannot be equated with the vapor's or an ice's.
+
+**Range and accuracy.** 130&ndash;400 K, from zero pressure to saturation and into moderately supersaturated vapor. Against the full IAPWS-95 formulation, saturated vapor between the triple point and 100 °C is within 1.4 &times; 10<sup>-5</sup> RT in G, 5.3 &times; 10<sup>-5</sup> in V, 0.9 % in Cp and 0.09 % in the speed of sound; the deviations fall with the third power of the pressure below saturation. At 100 °C the vapor is 1.5 % non-ideal, which the virial terms capture: G is within 1.4 &times; 10<sup>-5</sup> RT and V within 5.3 &times; 10<sup>-5</sup>, where an ideal gas is off by 1.5 % and 1.6 %. By 400 K the deviations reach 2 &times; 10<sup>-4</sup> in V and 1.2 % in Cp and grow quickly beyond.
+
+**Cost.** The model is closed-form with a Rust backend (NumPy fallback): per call, about 1.5 µs for a single point, 2 µs for 16 points, 50 µs for 1000 points, and 13 ms for 10<sup>6</sup> points on four threads.
 
 ## Troubleshooting
 
@@ -468,9 +515,9 @@ fallback is used. Results are identical; only speed differs.
 
 7. B. Journaux, J. M. Brown, A. Pacheco, S. D. Vance, A. Cochrane, T. Bollengier, et al., "Holistic approach for studying planetary hydrospheres: Gibbs representations, ices thermodynamics, transport, and the example of Europa," *J. Geophys. Res.: Planets* **125**, e2019JE006176 (2020). [doi:10.1029/2019JE006176](https://doi.org/10.1029/2019JE006176) -- Source of the SeaFreeze GLBF tensor-product B-spline coefficients used for `water1`, `IAPWS95`, and the ice phases (Ih, II, III, V, VI, VII/X) in the H₂O solid-liquid-vapor phase diagram.
 
-8. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment and the saturation/triple-point lines in the H₂O phase diagram.
+8. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment, the `vapor` model (ideal-gas part and virial coefficients), and the saturation/triple-point lines in the H₂O phase diagram.
 
-9. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation used for the Ice Ih/vapor boundary below 273.16 K in the H₂O phase diagram.
+9. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation (`vapor_eos.sublimation_pressure`), drawn as the Ice Ih/vapor reference curve below 273.16 K in the H₂O phase diagram.
 
 ## Authors
 

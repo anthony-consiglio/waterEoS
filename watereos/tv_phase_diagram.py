@@ -131,8 +131,9 @@ PHASE_CONFIGS = {
         'color': '#E0E0E0',
         # T range covers the full plotting window; the actual data is
         # built later by _evaluate_vapor, not by SeaFreeze. The P_min /
-        # P_max / n_P entries are advisory — vapor is sampled in V
-        # (geometrically from V_sat upward), not on the fixed P grid.
+        # P_max / n_P entries are advisory — vapor is sampled on a
+        # geometric pressure grid below its coexistence pressure, not on
+        # the fixed P grid.
         'T_min': 0.0,
         'T_max': 1273.0,
         'P_min': 0.0,
@@ -204,15 +205,15 @@ def _compute_saturation_curve(T_min=273.16, T_max=500.0, n_T=200):
 def _compute_sublimation_curve(T_min=190.0, T_max=273.16, n_T=200):
     """Compute the Ice Ih + Vapor coexistence (sublimation) curve.
 
-    Uses the IAPWS R14-08 sublimation pressure equation (private helper
-    `_Sublimation_Pressure` in the `iapws` package) to extend the
-    coexistence curve from the triple point at (273.16 K, 611.657 Pa)
-    down to lower temperatures. Returns (T, P_sub) in K and MPa.
+    Uses the IAPWS R14-08 sublimation pressure equation
+    (``vapor_eos.sublimation_pressure``) to extend the coexistence curve
+    from the triple point at (273.16 K, 611.657 Pa) down to lower
+    temperatures. Returns (T, P_sub) in K and MPa.
     Without this, the H2O T-P phase diagram has no Ice Ih + Vapor
     boundary below the triple point and the bottom-left quadrant of
     the figure reads as "empty".
     """
-    from iapws._iapws import _Sublimation_Pressure
+    from vapor_eos import sublimation_pressure
 
     # IAPWS R14-08 is valid down to 50 K; clamp T_min to a sensible
     # plotting floor so we don't burn samples on T's nobody views.
@@ -222,18 +223,11 @@ def _compute_sublimation_curve(T_min=190.0, T_max=273.16, n_T=200):
         return {'T': np.array([]), 'P_sub': np.array([])}
 
     T_arr = np.linspace(T_min, T_max, n_T)
-    T_valid, P_sub = [], []
-    for T in T_arr:
-        try:
-            P = _Sublimation_Pressure(float(T))  # MPa
-            if np.isfinite(P) and P > 0:
-                T_valid.append(float(T))
-                P_sub.append(float(P))
-        except (ValueError, RuntimeError):
-            continue
+    P_sub = sublimation_pressure(T_arr)  # MPa
+    valid = np.isfinite(P_sub) & (P_sub > 0)
     return {
-        'T': np.array(T_valid),
-        'P_sub': np.array(P_sub),
+        'T': T_arr[valid],
+        'P_sub': P_sub[valid],
     }
 
 
@@ -304,6 +298,12 @@ def sample_phase_at_T(phase_name, T, config=None):
     P : ndarray
         Pressure in MPa.
     """
+    if phase_name == 'vapor':
+        # Vapor has no meaning on the fixed P grid of the condensed
+        # phases; compute_tv_phase_diagram samples it with
+        # _evaluate_vapor instead.
+        return np.array([]), np.array([]), np.array([])
+
     if config is None:
         config = PHASE_CONFIGS[phase_name]
 
@@ -342,11 +342,10 @@ def sample_phase_at_T(phase_name, T, config=None):
 # ---------------------------------------------------------------------------
 # Batch SeaFreeze evaluation (one call per phase for ALL temperatures)
 # ---------------------------------------------------------------------------
-def _evaluate_vapor(temperatures, sat_data, sub_data, ih_phase_data,
-                    n_V=24, V_max_factor=100.0):
-    """Sample the water-vapor branch as an ideal gas anchored at the
-    L-V saturation curve (T >= 273.16 K) or the Ih-V sublimation curve
-    (T < 273.16 K).
+def _evaluate_vapor(temperatures, n_V=24, V_max_factor=100.0):
+    """Sample the water-vapor branch from the package's vapor equation of
+    state (``vapor_eos``: the IAPWS-95 ideal gas with the second and third
+    virial terms of its residual part).
 
     Vapor is included as a regular phase in the convex hull. Without
     it, the hull falls back to metastable extensions of water1 and the
@@ -354,113 +353,73 @@ def _evaluate_vapor(temperatures, sat_data, sub_data, ih_phase_data,
     those are the "Liquid sliver at V=1.1e-3" and "Ice Ih extending
     to 280 K" artifacts the user complained about.
 
-    Why ideal gas (instead of full IAPWS-95)?
-      * At vapor-like densities IAPWS-95 reduces to ideal gas to many
-        significant figures, so the simplification costs essentially
-        nothing in accuracy.
-      * The iapws Python package's IAPWS95(T, rho) returns extrapolated
-        / NaN-laden values below ~251 K and at very low rho — anchoring
-        to a single saturation/sublimation point and integrating the
-        ideal-gas dA/dV = -RT/V is fully robust.
-      * Reference-state alignment: at saturation/sublimation, G_vap =
-        G_liq (or G_Ih), so anchoring there keeps vapor's A on the same
-        scale as every other phase in the hull. No reference-state
-        gymnastics.
+    The vapor is on the reference state of the SeaFreeze phases, so its
+    Helmholtz energy A = G - P V enters the hull as it stands; nothing
+    is anchored to a tabulated coexistence curve. Each isotherm starts
+    at the pressure where the vapor coexists with the stable condensed
+    phase (ice Ih below 273.16 K, liquid water above), found by equating
+    the two Gibbs energies, and runs down to that pressure divided by
+    ``V_max_factor`` on a geometric grid. Starting exactly at coexistence
+    puts a sample on the common tangent, so the hull's two-phase boundary
+    with the vapor is exact and needs no refinement.
 
     Returns
     -------
     dict (same shape as the entries _batch_evaluate_phases produces for
     SeaFreeze phases), with one wrinkle: 'P' is 2-D (n_V, n_T) because
-    each (T, V) sample has its own ideal-gas P. The hull code is
-    updated to handle 2-D P via a small ndim dispatch.
+    each isotherm has its own pressure grid. The hull code handles 2-D
+    P via a small ndim dispatch.
     """
-    R = 461.523  # J/(kg·K), water specific gas constant
+    from vapor_eos import vapor_pressure
+    from watereos._seafreeze_native import getProp_scatter as _sf_scatter
+
+    temperatures = np.asarray(temperatures, dtype=np.float64)
     n_T = len(temperatures)
     V = np.full((n_V, n_T), np.nan)
     A = np.full((n_V, n_T), np.nan)
     P_2d = np.full((n_V, n_T), np.nan)
     T_mask = np.zeros(n_T, dtype=bool)
-
-    have_sat = (sat_data is not None and 'T' in sat_data
-                and len(sat_data['T']) > 0)
-    have_sub = (sub_data is not None and 'T' in sub_data
-                and len(sub_data['T']) > 0)
-    have_ih = (ih_phase_data is not None and 'V' in ih_phase_data
-               and ih_phase_data['V'].size > 0)
-
-    # Precompute the saturation-curve G values once (one IAPWS-95 call
-    # per saturation sample) so the per-T loop below is just an
-    # nearest-neighbour lookup.
-    sat_G = None
-    if have_sat:
-        try:
-            from iapws import IAPWS95
-            sat_G = np.full(len(sat_data['T']), np.nan)
-            for k, T_s in enumerate(sat_data['T']):
-                try:
-                    state = IAPWS95(T=float(T_s), x=0)
-                    if np.isfinite(state.g):
-                        sat_G[k] = state.g * 1e3  # kJ/kg → J/kg
-                except (ValueError, NotImplementedError, RuntimeError):
-                    pass
-        except ImportError:
-            have_sat = False
-
-    for j, T in enumerate(temperatures):
-        T = float(T)
-        # Reference (V_ref, P_ref, A_ref) on the coexistence curve
-        V_ref = P_ref = A_ref = None
-
-        if T >= 273.16 and have_sat and sat_G is not None:
-            idx = int(np.argmin(np.abs(sat_data['T'] - T)))
-            if abs(float(sat_data['T'][idx]) - T) <= 5.0:
-                P_ref = float(sat_data['P_sat'][idx])  # MPa
-                V_ref = float(sat_data['V_vap'][idx])  # m³/kg
-                G_ref = float(sat_G[idx])              # J/kg
-                if (np.isfinite(P_ref) and np.isfinite(V_ref)
-                        and np.isfinite(G_ref) and V_ref > 0
-                        and P_ref > 0):
-                    A_ref = G_ref - P_ref * 1e6 * V_ref
-        elif T < 273.16 and have_sub and have_ih:
-            idx = int(np.argmin(np.abs(sub_data['T'] - T)))
-            if abs(float(sub_data['T'][idx]) - T) <= 5.0:
-                P_ref = float(sub_data['P_sub'][idx])  # MPa
-                if (np.isfinite(P_ref) and P_ref > 0
-                        and ih_phase_data['T_mask'][j]):
-                    V_ref = R * T / (P_ref * 1e6)  # ideal-gas V
-                    # G_Ih(T, P_sub) ≈ A_Ih(T, P_min): Ih is
-                    # incompressible, so the (P_min - P_sub) integral
-                    # of V dP cancels the P_min·V term in A = G - P·V.
-                    col = int(ih_phase_data['col_map'][j])
-                    A_Ih = float(ih_phase_data['A'][0, col])
-                    if np.isfinite(A_Ih):
-                        # A_vap_at_sub = G_Ih - P_sub * V_vap_sub
-                        #              = A_Ih(P_min) - R·T  (one line)
-                        A_ref = A_Ih - R * T
-
-        if V_ref is None or A_ref is None:
-            continue
-
-        # Sample V on a geometric grid from V_ref to V_max_factor * V_ref.
-        # That spans the ideal-gas branch from the coexistence point
-        # outward; the hull's tangent from the adjacent phase touches
-        # vapor right at V_ref (slope dA/dV = -RT/V = -P_ref), so we
-        # don't need to sample below V_ref.
-        V_arr = np.geomspace(V_ref, V_ref * float(V_max_factor), n_V)
-        for i, V_val in enumerate(V_arr):
-            V[i, j] = float(V_val)
-            # Ideal gas: A(V) = A_ref - RT·ln(V/V_ref); P(V) = RT/V
-            A[i, j] = A_ref - R * T * np.log(V_val / V_ref)
-            P_2d[i, j] = R * T / V_val / 1e6  # Pa → MPa
-        T_mask[j] = True
-
-    return {
+    result = {
         'V': V,
         'A': A,
         'P': P_2d,                 # 2-D for vapor (varies per T)
         'T_mask': T_mask,
         'col_map': np.arange(n_T), # T-aligned columns
     }
+
+    cfg = PHASE_CONFIGS['vapor']
+    in_range = (temperatures >= cfg['T_min']) & (temperatures <= cfg['T_max'])
+
+    # Coexistence pressure with the stable condensed phase at each T
+    P_coex = np.full(n_T, np.nan)
+    cold = in_range & (temperatures < 273.16)
+    warm = in_range & (temperatures >= 273.16)
+    with _suppress():
+        if cold.any():
+            P_coex[cold] = vapor_pressure(temperatures[cold], 'Ih')
+        if warm.any():
+            P_coex[warm] = vapor_pressure(temperatures[warm], 'water1')
+    cols = np.flatnonzero(np.isfinite(P_coex) & (P_coex > 0))
+    if len(cols) == 0:
+        return result
+
+    # Geometric pressure grid from coexistence downward; for a nearly
+    # ideal gas this is the geometric volume grid from V_coex to
+    # V_max_factor * V_coex.
+    factor = np.geomspace(1.0, float(V_max_factor), n_V)
+    P_grid = P_coex[cols][None, :] / factor[:, None]
+    T_grid = np.broadcast_to(temperatures[cols][None, :], P_grid.shape)
+    out = _sf_scatter('vapor', P_grid.ravel(), T_grid.ravel())
+    V_grid = np.asarray(out.V).reshape(P_grid.shape)
+    A_grid = np.asarray(out.A).reshape(P_grid.shape)
+
+    good = np.isfinite(V_grid).all(axis=0) & np.isfinite(A_grid).all(axis=0)
+    cols = cols[good]
+    V[:, cols] = V_grid[:, good]
+    A[:, cols] = A_grid[:, good]
+    P_2d[:, cols] = P_grid[:, good]
+    T_mask[cols] = True
+    return result
 
 
 def _batch_evaluate_phases(phase_list, temperatures):
@@ -856,9 +815,9 @@ def _refine_slices_newton(diagram, max_iter=15, P_tol=1e-3):
     good Newton starting point. We just no longer rely on its discrete
     vertex locations for the final boundary geometry.
 
-    Vapor pairs are skipped — vapor is already an analytical ideal-gas
-    branch anchored at the saturation/sublimation curve, so its
-    coexistence with the adjacent condensed phase is exact.
+    Vapor pairs are skipped — the vapor branch starts exactly at its
+    coexistence pressure with the adjacent condensed phase (see
+    _evaluate_vapor), so that tangent is already exact.
 
     After refining each slice's tp entries, sp[i].V_max is set to
     tp[i].V_left and sp[i].V_min to tp[i-1].V_right so the polygons
@@ -880,7 +839,7 @@ def _refine_slices_newton(diagram, max_iter=15, P_tol=1e-3):
         T_arr = np.array([T_val], dtype=np.float64)
         for tp_entry in s['two_phase']:
             phase_a, phase_b = tp_entry['phases']
-            # Skip pairs that involve vapor (handled analytically by
+            # Skip pairs that involve vapor (already exact, see
             # _evaluate_vapor) or any phase not in SeaFreeze's library.
             if phase_a == 'vapor' or phase_b == 'vapor':
                 continue
@@ -1154,11 +1113,10 @@ def compute_tv_phase_diagram(T_min=190.0, T_max=353.5, dT=1.0,
     temperatures = np.arange(T_min, T_max + dT / 2, dT)
     n_T = len(temperatures)
 
-    # --- IAPWS saturation / sublimation curves (pre-compute) ---------------
-    # We need these now (rather than at the end as before) because the
-    # vapor phase is anchored at the L-V saturation curve (T >= 273.16 K)
-    # or the Ih-V sublimation curve (T < 273.16 K), so they have to exist
-    # before _evaluate_vapor runs.
+    # --- IAPWS saturation / sublimation curves -----------------------------
+    # Reference curves for the plotting layer only: the vapor branch of
+    # the hull comes from the vapor equation of state (_evaluate_vapor)
+    # and does not depend on them.
     sat_data = None
     sub_data = None
     iapws_liq = None
@@ -1185,8 +1143,8 @@ def compute_tv_phase_diagram(T_min=190.0, T_max=353.5, dT=1.0,
             print(f" {len(sub_data['T'])} points.")
 
     # --- Batch-evaluate SeaFreeze: one call per phase for all T's ----------
-    # Vapor is handled by a separate ideal-gas helper after this, since
-    # SeaFreeze doesn't model vapor.
+    # Vapor is sampled by a separate helper after this: it needs its own
+    # pressure grid at each temperature.
     if verbose:
         print("  Evaluating SeaFreeze for all phases...", end='', flush=True)
     sf_phase_list = [p for p in phase_list if p != 'vapor']
@@ -1196,11 +1154,8 @@ def compute_tv_phase_diagram(T_min=190.0, T_max=353.5, dT=1.0,
 
     if 'vapor' in phase_list and include_vapor:
         if verbose:
-            print("  Sampling vapor branch (ideal gas)...", end='',
-                  flush=True)
-        phase_data['vapor'] = _evaluate_vapor(
-            temperatures, sat_data, sub_data,
-            phase_data.get('Ih'))
+            print("  Sampling vapor branch...", end='', flush=True)
+        phase_data['vapor'] = _evaluate_vapor(temperatures)
         if verbose:
             n_valid_vapor = int(phase_data['vapor']['T_mask'].sum())
             print(f" {n_valid_vapor}/{n_T} T's covered.")
@@ -1225,8 +1180,8 @@ def compute_tv_phase_diagram(T_min=190.0, T_max=353.5, dT=1.0,
             V_col = pd['V'][:, col]
             A_col = pd['A'][:, col]
             # P is 1-D for SeaFreeze phases (fixed P grid shared across
-            # T) and 2-D for vapor (different P at each T because vapor
-            # is sampled in V, with P = R*T/V).
+            # T) and 2-D for vapor (its pressure grid starts at the
+            # coexistence pressure of each T).
             P_col = (pd['P'][:, col] if pd['P'].ndim > 1 else pd['P'])
             valid = np.isfinite(V_col) & np.isfinite(A_col)
             if valid.sum() > 0:
@@ -1294,9 +1249,9 @@ def compute_tv_phase_diagram(T_min=190.0, T_max=353.5, dT=1.0,
             print(f"    Invariant at T = {inv['T']:.1f} K: "
                   f"{' / '.join(inv['phases'])}")
 
-    # Attach the saturation/sublimation curves we already computed for
-    # vapor anchoring so the plotting layer can still draw them as
-    # explicit black-dashed lines on top of the hull-derived polygons.
+    # Attach the saturation/sublimation curves so the plotting layer can
+    # draw them as explicit black-dashed lines on top of the hull-derived
+    # polygons.
     if include_vapor:
         diagram['saturation'] = sat_data
         diagram['sublimation'] = sub_data

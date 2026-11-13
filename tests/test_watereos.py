@@ -40,7 +40,7 @@ def test_list_models():
     from watereos import list_models
     models = list_models()
     assert isinstance(models, list)
-    assert len(models) == 12
+    assert len(models) == 13
     assert 'duska2020' in models
     assert 'caupin2019' in models
     assert 'singh2017_caupin2019' in models
@@ -51,6 +51,7 @@ def test_list_models():
     assert 'singh2017' in models
     assert 'water1' in models
     assert 'IAPWS95' in models
+    assert 'vapor' in models
 
 def test_invalid_model():
     from watereos import getProp
