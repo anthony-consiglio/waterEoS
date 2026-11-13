@@ -29,8 +29,9 @@ dependencies = [
 # data/extract_seafreeze_splines.py spline extractor and for the
 # cross-validation tests (tests/test_rust_seafreeze.py). At runtime the
 # native watereos_rs evaluator covers all SeaFreeze functionality the
-# package needs.
-dev = ["jax>=0.4.30", "pytest", "SeaFreeze>=0.9"]
+# package needs. httpx is the HTTP client behind fastapi.testclient, which
+# the API tests use.
+dev = ["jax>=0.4.30", "pytest", "SeaFreeze>=0.9", "httpx"]
 web = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

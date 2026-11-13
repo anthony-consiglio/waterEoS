@@ -82,6 +82,21 @@ def _props_for(phase: str) -> list[str]:
     return PROPS_FLUID if phase in fluids else PROPS_SOLID
 
 
+def _reference(ref, key: str) -> np.ndarray:
+    """Reference value of ``key`` from a SeaFreeze ``getProp`` result.
+
+    SeaFreeze 1.1.0 stopped returning the specific volume ``V`` from the
+    all-properties call (1.0.0 and earlier included it), to match the output
+    of the Matlab ``SF_getprop``. The reference defines it as the reciprocal
+    of its density (``lbftd.statevars.evalVolume``: ``V = rho ** -1``), so
+    when ``V`` is absent the same quantity is rebuilt from the reference
+    ``rho`` and the comparison is the one made against older releases.
+    """
+    if key == "V" and not hasattr(ref, "V"):
+        return 1.0 / np.asarray(ref.rho, dtype=float)
+    return np.asarray(getattr(ref, key))
+
+
 def _close(a: np.ndarray, b: np.ndarray, *, label: str) -> None:
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
@@ -114,7 +129,7 @@ def test_grid_matches_reference(phase: str) -> None:
 
     for key in _props_for(phase):
         rust_val = np.asarray(rust[key])
-        ref_val = np.asarray(getattr(ref, key))
+        ref_val = _reference(ref, key)
         _close(rust_val, ref_val, label=f"{phase}/{key} (grid)")
 
 
@@ -138,7 +153,7 @@ def test_scatter_matches_reference(phase: str) -> None:
 
     for key in _props_for(phase):
         rust_val = np.asarray(rust[key]).ravel()
-        ref_val = np.asarray(getattr(ref, key)).ravel()
+        ref_val = _reference(ref, key).ravel()
         _close(rust_val, ref_val, label=f"{phase}/{key} (scatter)")
 
 
