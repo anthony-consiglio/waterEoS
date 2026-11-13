@@ -535,7 +535,7 @@ BibTeX entry for the software package:
   title        = {{waterEoS}: Thermodynamic equations of state for supercooled water},
   year         = {2026},
   url          = {https://github.com/anthony-consiglio/waterEoS},
-  version      = {0.6.0},
+  version      = {0.7.0},
   license      = {GPL-3.0-only},
 }
 ```
