@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 
 mod branch;
+mod par;
 mod caupin;
 mod holten;
 mod duska;

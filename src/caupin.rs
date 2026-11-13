@@ -4,9 +4,14 @@ use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use rayon::prelude::*;
 
 use crate::branch::{mask_mixture, select_branch, Branch};
+use crate::par::map_indexed;
+
+/// Smallest task handed to the thread pool (see par.rs). A point costs
+/// about 0.3 us, so a batch of fewer than 512 points stays on the
+/// calling thread.
+const PAR_GRAIN: usize = 256;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Parameter sets (caupin_eos/params.py = Table III, params_kim.py = Table II)
@@ -415,17 +420,15 @@ fn caupin_compute_batch<'py>(
     let mut ks_b = Array1::<f64>::zeros(n); let mut alpha_b = Array1::<f64>::zeros(n);
     let mut vel_b = Array1::<f64>::zeros(n);
 
-    // Parallel per-point compute. Each (T, P) point is independent, so
-    // rayon work-stealing scales linearly with available cores. The
-    // sequential unpack that follows is pure memory writes — cheap.
-    // py.allow_threads releases the GIL during the parallel block so
-    // other Python threads (e.g. an awaiting FastAPI worker) keep
-    // making progress.
+    // Per-point compute. Each (T, P) point is independent, so a large
+    // batch is split across the rayon pool, where work-stealing scales
+    // linearly with available cores; a small one stays on this thread
+    // (see par.rs). The sequential unpack that follows is pure memory
+    // writes — cheap. py.allow_threads releases the GIL during the
+    // compute so other Python threads (e.g. an awaiting FastAPI worker)
+    // keep making progress.
     let points: Vec<PointResult> = py.allow_threads(|| {
-        (0..n)
-            .into_par_iter()
-            .map(|i| compute_point(t_data[i], p_data[i], prm, branch))
-            .collect()
+        map_indexed(n, PAR_GRAIN, |i| compute_point(t_data[i], p_data[i], prm, branch))
     });
 
     for i in 0..n {
