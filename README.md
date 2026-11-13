@@ -422,9 +422,8 @@ vapor_pressure(253.15, 'holten2014')          # 1.2546e-4 MPa, supercooled water
 | `'IAPWS95'`, `'water1'`, `'duska2020'` vs. IAPWS-95 saturation pressure | 273.16&ndash;373.15 K | 0.003 % |
 | `'holten2014'`, `'caupin2019'`, `'caupin2019_kim'` | 273.16&ndash;300 K | 0.002 % |
 | `'grenke2025'` | 273.16&ndash;300 K | 0.004 % |
+| `'shi_tanaka2020'` | 273.16&ndash;320 K | 0.013 % |
 | `'holten2014'`, supercooled, vs. Murphy & Koop (2005) | 233.15&ndash;263.15 K | 0.19 % |
-
-`shi_tanaka2020` is not aligned to the IAPWS-95 reference state, so its Gibbs energy cannot be equated with the vapor's or an ice's.
 
 **Range and accuracy.** 130&ndash;400 K, from zero pressure to saturation and into moderately supersaturated vapor. Against the full IAPWS-95 formulation, saturated vapor between the triple point and 100 °C is within 1.4 &times; 10<sup>-5</sup> RT in G, 5.3 &times; 10<sup>-5</sup> in V, 0.9 % in Cp and 0.09 % in the speed of sound; the deviations fall with the third power of the pressure below saturation. At 100 °C the vapor is 1.5 % non-ideal, which the virial terms capture: G is within 1.4 &times; 10<sup>-5</sup> RT and V within 5.3 &times; 10<sup>-5</sup>, where an ideal gas is off by 1.5 % and 1.6 %. By 400 K the deviations reach 2 &times; 10<sup>-4</sup> in V and 1.2 % in Cp and grow quickly beyond.
 

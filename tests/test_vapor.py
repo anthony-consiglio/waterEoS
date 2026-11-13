@@ -271,6 +271,7 @@ class TestReferenceState:
         ('caupin2019_kim', 300.0, 5e-5),
         ('grenke2025', 300.0, 1e-4),
         ('duska2020', 373.15, 5e-5),
+        ('shi_tanaka2020', 320.0, 3e-4),
     ]
 
     @pytest.mark.parametrize("model, T_hi, tol", LIQUIDS)
