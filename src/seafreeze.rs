@@ -26,7 +26,18 @@ use numpy::ndarray::{Array1, Array2};
 use numpy::{IntoPyArray, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use rayon::prelude::*;
+
+use crate::par::map_indexed;
+
+/// Smallest task handed to the thread pool (see par.rs). A point costs
+/// about 1 us (the Gibbs energy and six of its derivatives), so a batch
+/// of fewer than 128 points stays on the calling thread.
+const PAR_GRAIN: usize = 64;
+
+/// The same for `sf_eval_raw`, where a point is a single derivative and
+/// costs about 0.13 us: a batch of fewer than 1024 points stays on the
+/// calling thread.
+const RAW_PAR_GRAIN: usize = 512;
 
 const SPLINE_BIN: &[u8] =
     include_bytes!("../watereos/data/seafreeze_splines.bin");
@@ -447,10 +458,7 @@ pub struct PropsArrays {
     pub vs: Vec<f64>,
 }
 
-fn props_arrays<I>(sp: &Spline2D, pairs: I) -> PropsArrays
-where
-    I: IndexedParallelIterator<Item = (f64, f64)>,
-{
+fn props_arrays(sp: &Spline2D, pairs: &[(f64, f64)]) -> PropsArrays {
     let n = pairs.len();
     let mut out = PropsArrays {
         g: vec![0.0; n], v: vec![0.0; n], rho: vec![0.0; n],
@@ -460,7 +468,10 @@ where
         shear: vec![0.0; n], vp: vec![0.0; n], vs: vec![0.0; n],
     };
 
-    let computed: Vec<Props> = pairs.map(|(p, t)| compute_props(sp, p, t)).collect();
+    let computed: Vec<Props> = map_indexed(n, PAR_GRAIN, |i| {
+        let (p, t) = pairs[i];
+        compute_props(sp, p, t)
+    });
     for (i, pr) in computed.iter().enumerate() {
         out.g[i] = pr.g; out.v[i] = pr.v; out.rho[i] = pr.rho;
         out.s[i] = pr.s; out.h[i] = pr.h; out.u[i] = pr.u; out.a[i] = pr.a;
@@ -538,7 +549,7 @@ pub fn sf_getprop_grid<'py>(
                 pairs.push((p_arr[i], t_arr[j]));
             }
         }
-        props_arrays(sp, pairs.into_par_iter())
+        props_arrays(sp, &pairs)
     });
     fill_dict(py, sp, arrays, Some((n_p, n_t)))
 }
@@ -562,7 +573,7 @@ pub fn sf_getprop_scatter<'py>(
 
     let arrays = py.allow_threads(|| {
         let pairs: Vec<(f64, f64)> = (0..n).map(|i| (p_arr[i], t_arr[i])).collect();
-        props_arrays(sp, pairs.into_par_iter())
+        props_arrays(sp, &pairs)
     });
     fill_dict(py, sp, arrays, None)
 }
@@ -586,17 +597,11 @@ pub fn sf_eval_raw<'py>(
     if grid {
         let n_p = p_arr.len();
         let n_t = t_arr.len();
+        // Row-major: point k is (P[k / n_t], T[k % n_t]).
         let flat: Vec<f64> = py.allow_threads(|| {
-            let p_ref = &p_arr;
-            let t_ref = &t_arr;
-            (0..n_p)
-                .into_par_iter()
-                .flat_map(|i| {
-                    (0..n_t)
-                        .map(move |j| eval_point(sp, p_ref[i], t_ref[j], deriv_p, deriv_t))
-                        .collect::<Vec<_>>()
-                })
-                .collect()
+            map_indexed(n_p * n_t, RAW_PAR_GRAIN, |k| {
+                eval_point(sp, p_arr[k / n_t], t_arr[k % n_t], deriv_p, deriv_t)
+            })
         });
         let arr = Array2::from_shape_vec((n_p, n_t), flat)
             .expect("shape mismatch in raw grid eval");
@@ -604,10 +609,9 @@ pub fn sf_eval_raw<'py>(
     } else {
         assert_eq!(p_arr.len(), t_arr.len());
         let vals: Vec<f64> = py.allow_threads(|| {
-            (0..p_arr.len())
-                .into_par_iter()
-                .map(|i| eval_point(sp, p_arr[i], t_arr[i], deriv_p, deriv_t))
-                .collect()
+            map_indexed(p_arr.len(), RAW_PAR_GRAIN, |i| {
+                eval_point(sp, p_arr[i], t_arr[i], deriv_p, deriv_t)
+            })
         });
         Ok(Array1::from(vals).into_pyarray(py).into_any())
     }

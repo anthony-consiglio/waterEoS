@@ -7,9 +7,14 @@ use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use rayon::prelude::*;
 
 use crate::branch::{mask_mixture, select_branch, Branch};
+use crate::par::map_indexed;
+
+/// Smallest task handed to the thread pool (see par.rs). A point costs
+/// about 1 us, so a batch of fewer than 128 points stays on the calling
+/// thread.
+const PAR_GRAIN: usize = 64;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants from holten_eos/params.py
@@ -431,12 +436,9 @@ pub fn compute_batch_holten<'py>(
     let mut ks_b = Array1::<f64>::zeros(n); let mut alpha_b = Array1::<f64>::zeros(n);
     let mut vel_b = Array1::<f64>::zeros(n);
 
-    // Parallel per-point compute; see caupin.rs for the rationale.
+    // Per-point compute; see caupin.rs for the rationale.
     let points: Vec<PointResult> = py.allow_threads(|| {
-        (0..n)
-            .into_par_iter()
-            .map(|i| compute_point(t_data[i], p_data[i], branch))
-            .collect()
+        map_indexed(n, PAR_GRAIN, |i| compute_point(t_data[i], p_data[i], branch))
     });
 
     for i in 0..n {
