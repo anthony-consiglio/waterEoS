@@ -95,12 +95,16 @@ c1  = -39.91             # coefficient of T̂·(ln T̂ - 1)
 RHO_PREFACTOR = N_UNIT * M_H2O / (NA * Vr)      # kg/m³ when divided by V̂
 
 # ── IAPWS-95 reference state alignment ────────────────────────────────────
-# Placeholder offsets so S and G are returned as raw values from the model
-# (zero of entropy / Gibbs is arbitrary in this model). Set to nonzero
-# values after calibrating against IAPWS-95 at (T_REF, P_REF) if needed.
-T_REF = 273.15           # K
-S_OFFSET = 0.0           # J/(kg·K)
-H_OFFSET = 0.0           # J/kg
+# Offsets calibrated at T_ref=273.15 K, P_ref=0.1 MPa so that
+# S_aligned = S_raw + S_OFFSET matches IAPWS-95 entropy,
+# G_aligned = G_raw + H_OFFSET - T * S_OFFSET matches IAPWS-95 Gibbs.
+# The target is the 'IAPWS95' model of this package (SeaFreeze
+# water_IAPWS95): G = 100.0175184735 J/kg, S = -0.1477367914 J/(kg·K).
+# The zeros of entropy and Gibbs energy are arbitrary in the model itself
+# (Table S2 has no c_00 or c_10 term).
+T_REF = 273.15                  # K
+S_OFFSET = 439.0190737797       # J/(kg·K)
+H_OFFSET = -399179.7203565587   # J/kg
 
 # ── Validity range (Fig. 2 & S2 of the paper) ─────────────────────────────
 # Density data covers ~240–320 K at 0.1 MPa with extrapolation to ~190 K

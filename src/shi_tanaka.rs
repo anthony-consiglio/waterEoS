@@ -50,9 +50,10 @@ const C30: f64 = -0.3602;
 const C31: f64 = 2.062;
 const C1: f64 = -39.91;
 
-// IAPWS-95 alignment offsets (placeholders — zero until calibrated)
-const S_OFFSET: f64 = 0.0;
-const H_OFFSET: f64 = 0.0;
+// IAPWS-95 reference-state alignment at 273.15 K, 0.1 MPa
+// (shi_tanaka_eos/params.py)
+const S_OFFSET: f64 = 439.0190737797;
+const H_OFFSET: f64 = -399179.7203565587;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Background G_ρ polynomial + derivatives  (scalar)
@@ -211,7 +212,7 @@ fn compute_point(t_k: f64, p_mpa: f64) -> PointResult {
     let (rho_b, v_b, mut s_b, mut g_b, cp_b, cv_b, kt_b, ks_b, alpha_b, vel_b) =
         physical(vh_b, sh_b, d2grho_dp2, d2grho_dt2, d2grho_dpdt, g_hat_b, t_k);
 
-    // IAPWS-95 alignment (no-op until calibrated)
+    // IAPWS-95 reference-state alignment
     s_val += S_OFFSET; g += H_OFFSET - t_k * S_OFFSET;
     s_a += S_OFFSET; g_a += H_OFFSET - t_k * S_OFFSET;
     s_b += S_OFFSET; g_b += H_OFFSET - t_k * S_OFFSET;
