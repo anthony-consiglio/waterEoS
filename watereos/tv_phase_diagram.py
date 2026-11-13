@@ -304,6 +304,12 @@ def sample_phase_at_T(phase_name, T, config=None):
     P : ndarray
         Pressure in MPa.
     """
+    if phase_name == 'vapor':
+        # Vapor has no meaning on the fixed P grid of the condensed
+        # phases; compute_tv_phase_diagram samples it with
+        # _evaluate_vapor instead.
+        return np.array([]), np.array([]), np.array([])
+
     if config is None:
         config = PHASE_CONFIGS[phase_name]
 

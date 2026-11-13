@@ -17,6 +17,13 @@ and this module exposes that backend with a SeaFreeze-shaped API:
 If the Rust extension isn't importable for some reason (e.g. wheel
 build failed), we transparently fall back to the upstream package so
 the rest of watereos keeps working.
+
+Water vapor is not a SeaFreeze phase, but it is served here under the
+phase name ``'vapor'`` so that it can be evaluated exactly like the ices
+and liquids: same call, same argument order, same units and the same
+reference state. It is dispatched to ``vapor_eos`` (Rust backend, NumPy
+fallback) and returns G, V, rho, S, H, U, A, Cp, Cv, Kt, Ks, Kp, alpha
+and vel.
 """
 
 from __future__ import annotations
@@ -41,6 +48,22 @@ if not _HAVE_RUST:  # pragma: no cover
             "Neither watereos_rs (Rust seafreeze backend) nor the upstream "
             "'seafreeze' package is available; install one of them."
         ) from exc
+
+
+VAPOR = "vapor"
+
+_vapor_backend = None
+
+
+def _vapor():
+    """(compute_batch, compute_grid) of the vapor model, imported on first use."""
+    global _vapor_backend
+    if _vapor_backend is None:
+        from vapor_eos.vapor_eos import (
+            _backend_compute_batch, _backend_compute_grid,
+        )
+        _vapor_backend = (_backend_compute_batch, _backend_compute_grid)
+    return _vapor_backend
 
 
 def _is_scatter_PTm(PTm: Any) -> bool:
@@ -85,8 +108,17 @@ def _split_scatter(PTm: Any) -> tuple[np.ndarray, np.ndarray]:
 def getProp(PTm: Any, phase: str) -> SimpleNamespace:
     """SeaFreeze-compatible ``getProp`` powered by the Rust backend.
 
-    Parameters mirror ``seafreeze.seafreeze.getProp``.
+    Parameters mirror ``seafreeze.seafreeze.getProp``; ``phase`` may also
+    be ``'vapor'``.
     """
+    if phase == VAPOR:
+        if _is_scatter_PTm(PTm):
+            P, T = _split_scatter(PTm)
+            return SimpleNamespace(**_vapor()[0](T, P))
+        P = np.ascontiguousarray(np.asarray(PTm[0], dtype=np.float64).ravel())
+        T = np.ascontiguousarray(np.asarray(PTm[1], dtype=np.float64).ravel())
+        return SimpleNamespace(**_vapor()[1](T, P))
+
     if not _HAVE_RUST:  # pragma: no cover
         return _sf_ref.getProp(PTm, phase)
 
@@ -103,6 +135,10 @@ def getProp(PTm: Any, phase: str) -> SimpleNamespace:
 
 def getProp_grid(phase: str, P: np.ndarray, T: np.ndarray) -> SimpleNamespace:
     """Direct grid-mode entry that skips PTm packing/parsing overhead."""
+    if phase == VAPOR:
+        P = np.ascontiguousarray(P, dtype=np.float64)
+        T = np.ascontiguousarray(T, dtype=np.float64)
+        return SimpleNamespace(**_vapor()[1](T, P))
     if not _HAVE_RUST:  # pragma: no cover
         PT = np.array([np.asarray(P), np.asarray(T)], dtype=object)
         return _sf_ref.getProp(PT, phase)
@@ -113,6 +149,12 @@ def getProp_grid(phase: str, P: np.ndarray, T: np.ndarray) -> SimpleNamespace:
 
 def getProp_scatter(phase: str, P: np.ndarray, T: np.ndarray) -> SimpleNamespace:
     """Direct scatter-mode entry for paired (P, T) inputs."""
+    if phase == VAPOR:
+        P = np.ascontiguousarray(P, dtype=np.float64)
+        T = np.ascontiguousarray(T, dtype=np.float64)
+        if P.shape != T.shape:
+            raise ValueError("scatter getProp requires equal-shape P and T")
+        return SimpleNamespace(**_vapor()[0](T, P))
     if not _HAVE_RUST:  # pragma: no cover
         PT = np.empty(len(P), dtype=object)
         PT[:] = list(zip(np.asarray(P), np.asarray(T)))

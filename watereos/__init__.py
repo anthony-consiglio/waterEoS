@@ -27,7 +27,9 @@ Or ``getProp()`` for SeaFreeze-compatible grid/scatter input::
 Available models: ``'holten2014'``, ``'caupin2019'``, ``'caupin2019_kim'``,
 ``'duska2020'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
 ``'grenke2025'``, ``'singh2017'``, ``'singh2017_caupin2019'``,
-``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``.
+``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``, and ``'vapor'``
+(water vapor on the same reference state, so that its Gibbs energy can be
+compared with the liquids and with the SeaFreeze ices).
 
 See ``watereos.model_registry.MODEL_REGISTRY`` for metadata on each model,
 or call ``list_models()`` for a quick summary. Call ``backend()`` to see
@@ -56,15 +58,16 @@ except ImportError:
 
 
 def backend(model=None):
-    """Return which backend (rust/jax/numpy) is being used per two-state model.
+    """Return which backend (rust/jax/numpy) is being used per two-state model
+    and for the vapor.
 
     Parameters
     ----------
     model : str or None
         If None (default), return a dict mapping every two-state model key
-        to its active backend string. Otherwise return the backend string
-        for the named model (e.g. ``'caupin2019'``, ``'holten2014'``,
-        ``'duska2020'``, ``'caupin2019_kim'``).
+        (and ``'vapor'``) to its active backend string. Otherwise return
+        the backend string for the named model (e.g. ``'caupin2019'``,
+        ``'holten2014'``, ``'duska2020'``, ``'caupin2019_kim'``).
 
     Returns
     -------
@@ -84,10 +87,14 @@ def backend(model=None):
                           ('caupin2019_kim', 'caupin_eos.caupin_kim_eos'),
                           ('holten2014', 'holten_eos.holten_eos'),
                           ('duska2020', 'duska_eos.duska_eos'),
-                          ('shi_tanaka2020', 'shi_tanaka_eos.shi_tanaka_eos')]:
+                          ('shi_tanaka2020', 'shi_tanaka_eos.shi_tanaka_eos'),
+                          ('vapor', 'vapor_eos.vapor_eos')]:
         try:
             mod = importlib.import_module(modname)
-            cb = getattr(mod, 'compute_batch', None)
+            # A module may wrap its backend in a thin compute_batch; the
+            # backend callable itself is then _backend_compute_batch.
+            cb = (getattr(mod, '_backend_compute_batch', None)
+                  or getattr(mod, 'compute_batch', None))
             if cb is None:
                 result[mkey] = 'unknown'
                 continue

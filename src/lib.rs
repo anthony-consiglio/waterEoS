@@ -1,4 +1,5 @@
-//! watereos_rs: Rust accelerators for three two-state water EoS models.
+//! watereos_rs: Rust accelerators for the two-state water EoS models,
+//! the SeaFreeze phases and water vapor.
 
 use pyo3::prelude::*;
 
@@ -9,6 +10,7 @@ mod duska;
 mod shi_tanaka;
 mod phase;
 mod seafreeze;
+mod vapor;
 
 #[pymodule]
 fn watereos_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -33,5 +35,8 @@ fn watereos_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(seafreeze::sf_getprop_scatter, m)?)?;
     m.add_function(wrap_pyfunction!(seafreeze::sf_eval_raw, m)?)?;
     m.add_function(wrap_pyfunction!(seafreeze::sf_phases, m)?)?;
+    // Water vapor (IAPWS-95 ideal gas + second and third virial terms)
+    m.add_function(wrap_pyfunction!(vapor::compute_batch_vapor, m)?)?;
+    m.add_function(wrap_pyfunction!(vapor::compute_grid_vapor, m)?)?;
     Ok(())
 }

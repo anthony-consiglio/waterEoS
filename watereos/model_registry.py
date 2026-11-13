@@ -257,6 +257,21 @@ MODEL_REGISTRY = {
         P_min=-110, P_max=200,
         properties=TRANSPORT_PROPS,
     ),
+    'vapor': ModelInfo(
+        display_name='Water vapor',
+        model_key='vapor',
+        is_two_state=False,
+        has_phase_diagram=False,
+        has_transport=False,
+        # IAPWS-95 ideal gas with the second and third virial coefficients
+        # of its residual part. 130 K is the limit of the ideal-gas part;
+        # by 400 K the truncated virial series is within 2e-4 in volume of
+        # the full formulation at saturation (0.246 MPa) and loses accuracy
+        # quickly beyond. Pressure must be positive.
+        T_min=130, T_max=400,
+        P_min=0.0, P_max=0.25,
+        properties=EMPIRICAL_PROPS,
+    ),
 }
 
 # Ordered list for consistent UI display
@@ -264,7 +279,7 @@ MODEL_ORDER = [
     'duska2020', 'holten2014', 'caupin2019', 'caupin2019_kim',
     'shi_tanaka2020', 'shi_tanaka2020_transport',
     'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
-    'water1', 'IAPWS95',
+    'water1', 'IAPWS95', 'vapor',
 ]
 
 
