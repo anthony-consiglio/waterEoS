@@ -88,20 +88,18 @@ The largest deviation is 0.010 % between 190 K and 273.16 K and 0.017 % down to 
 
 **Liquid models** against the saturation pressure of IAPWS-95 (deviation in percent):
 
-| T / K | p_sat / Pa | `IAPWS95` | `water1` | `holten2014` | `caupin2019` | `caupin2019_kim` | `duska2020` | `grenke2025` |
-|------:|-----------:|----------:|---------:|-------------:|-------------:|-----------------:|------------:|-------------:|
-| 273.16 | 611.65 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 |
-| 280.00 | 991.82 | -0.001 | -0.002 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 |
-| 290.00 | 1920.00 | -0.001 | -0.003 | -0.001 | -0.001 | -0.001 | -0.002 | +0.001 |
-| 300.00 | 3536.81 | -0.001 | -0.003 | -0.001 | -0.000 | -0.000 | -0.002 | +0.004 |
-| 320.00 | 10545.98 | -0.002 | -0.003 | -0.002 | -0.001 | +0.002 | -0.002 | +0.013 |
-| 340.00 | 27187.81 | -0.001 | -0.002 | -0.002 | -0.008 | +0.018 | -0.002 | +0.028 |
-| 360.00 | 62193.57 | -0.002 | -0.002 | +0.002 | -0.026 | +0.089 | -0.001 | +0.053 |
-| 373.15 | 101418.00 | -0.002 | -0.003 | +0.008 | -0.044 | +0.199 | -0.002 | +0.078 |
+| T / K | p_sat / Pa | `IAPWS95` | `water1` | `holten2014` | `caupin2019` | `caupin2019_kim` | `duska2020` | `grenke2025` | `shi_tanaka2020` |
+|------:|-----------:|----------:|---------:|-------------:|-------------:|-----------------:|------------:|-------------:|-----------------:|
+| 273.16 | 611.65 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 |
+| 280.00 | 991.82 | -0.001 | -0.002 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 | -0.001 |
+| 290.00 | 1920.00 | -0.001 | -0.003 | -0.001 | -0.001 | -0.001 | -0.002 | +0.001 | +0.002 |
+| 300.00 | 3536.81 | -0.001 | -0.003 | -0.001 | -0.000 | -0.000 | -0.002 | +0.004 | +0.007 |
+| 320.00 | 10545.98 | -0.002 | -0.003 | -0.002 | -0.001 | +0.002 | -0.002 | +0.013 | +0.012 |
+| 340.00 | 27187.81 | -0.001 | -0.002 | -0.002 | -0.008 | +0.018 | -0.002 | +0.028 | -0.026 |
+| 360.00 | 62193.57 | -0.002 | -0.002 | +0.002 | -0.026 | +0.089 | -0.001 | +0.053 | -0.166 |
+| 373.15 | 101418.00 | -0.002 | -0.003 | +0.008 | -0.044 | +0.199 | -0.002 | +0.078 | -0.340 |
 
-The deviations above 300 K for `holten2014`, `caupin2019`, `caupin2019_kim` and `grenke2025` are outside the range those liquids were fitted to; they measure the liquid, not the vapor. The transport models `singh2017*` inherit the Gibbs energy of their thermodynamic backbone.
-
-`shi_tanaka2020` is not on the IAPWS-95 reference state (its alignment offsets are placeholders), so its Gibbs energy cannot be equated with the vapor's, or with an ice's.
+The deviations above 300 K for `holten2014`, `caupin2019`, `caupin2019_kim` and `grenke2025`, and above 320 K for `shi_tanaka2020`, are outside the range those liquids were fitted to; they measure the liquid, not the vapor. The transport models `singh2017*` and `shi_tanaka2020_transport` inherit the Gibbs energy of their thermodynamic backbone.
 
 **Supercooled water** (`holten2014`) against Murphy & Koop (2005): 286.44, 125.46, 50.88 and 18.88 Pa at 263.15, 253.15, 243.15 and 233.15 K, against 286.6, 125.6, 51.0 and 18.9 Pa.
 
