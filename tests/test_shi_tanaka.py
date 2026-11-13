@@ -19,6 +19,9 @@ These tests pin:
   - Dispatcher routes both model keys correctly.
   - Transport module produces finite, monotonically-correct viscosity,
     diffusion, and rotational relaxation across the supercooled regime.
+  - The IAPWS-95 reference state: G and S at 273.15 K, 0.1 MPa in both
+    backends, with the same additive offsets on the mixture and on each
+    pure state.
 """
 
 import numpy as np
@@ -112,13 +115,21 @@ def test_rust_python_parity():
     rs = rs_batch(np.ascontiguousarray(T_flat),
                   np.ascontiguousarray(P_flat))
 
+    # S, G, H, U and A carry the reference-state offsets and pass close to
+    # zero near 273.15 K, so their rounding error scales with the offset
+    # terms, not with the aligned value.
+    g_offset = np.abs(STP.H_OFFSET - T_flat * STP.S_OFFSET)
+    offset_scale = {'S': abs(STP.S_OFFSET), 'G': g_offset, 'A': g_offset,
+                    'H': abs(STP.H_OFFSET), 'U': abs(STP.H_OFFSET)}
+
     for key in ['rho', 'V', 'S', 'G', 'H', 'U', 'A',
                 'Cp', 'Cv', 'Kt', 'Ks', 'alpha', 'vel', 'x',
-                'rho_A', 'Cp_A', 'Kt_A',
-                'rho_B', 'Cp_B', 'Kt_B']:
+                'rho_A', 'Cp_A', 'Kt_A', 'S_A', 'G_A', 'H_A', 'U_A', 'A_A',
+                'rho_B', 'Cp_B', 'Kt_B', 'S_B', 'G_B', 'H_B', 'U_B', 'A_B']:
         a = np.asarray(py[key])
         b = np.asarray(rs[key])
-        denom = np.where(np.abs(a) > 1e-12, np.abs(a), 1.0)
+        denom = (np.where(np.abs(a) > 1e-12, np.abs(a), 1.0)
+                 + offset_scale.get(key.split('_')[0], 0.0))
         max_rel_err = float(np.max(np.abs(a - b) / denom))
         assert max_rel_err < 1e-12, (
             f"Rust/Python divergence on {key}: max_rel_err={max_rel_err:.3e}"
@@ -272,3 +283,82 @@ def test_dynamic_schottky_line_at_207K():
     assert abs(s_D - 0.5) < 0.01, (
         f"s^D({T_predicted:.1f}) = {s_D:.4f}, expected ~0.5"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 9. IAPWS-95 reference state
+# ═══════════════════════════════════════════════════════════════════════════
+
+# G and S of the 'IAPWS95' model (SeaFreeze water_IAPWS95) at 273.15 K and
+# 0.1 MPa, the state every liquid model of the package is aligned to.
+T_REF, P_REF = 273.15, 0.1
+G_IAPWS95 = 100.0175184735     # J/kg
+S_IAPWS95 = -0.1477367914      # J/(kg K)
+
+
+def _backend_batch(backend):
+    if backend == 'numpy':
+        return py_batch
+    rs_batch = _get_rust_batch()
+    if rs_batch is None:
+        pytest.skip("watereos_rs Rust extension not available")
+    return rs_batch
+
+
+@pytest.mark.parametrize('backend', ['numpy', 'rust'])
+def test_reference_state_pinned_in_each_backend(backend):
+    """G and S at 273.15 K, 0.1 MPa are the IAPWS-95 values."""
+    out = _backend_batch(backend)(np.array([T_REF]), np.array([P_REF]))
+    assert float(out['G'][0]) == pytest.approx(G_IAPWS95, abs=1e-8)
+    assert float(out['S'][0]) == pytest.approx(S_IAPWS95, abs=1e-9)
+
+
+@pytest.mark.parametrize('model', ['shi_tanaka2020',
+                                   'shi_tanaka2020_transport'])
+def test_reference_state_matches_iapws95_model(model):
+    """Through the dispatcher, G and S agree with the 'IAPWS95' model."""
+    PT = np.empty(1, dtype=object)
+    PT[0] = (P_REF, T_REF)
+    out = watereos.getProp(PT, model)
+    ref = watereos.getProp(PT, 'IAPWS95')
+    assert float(out.G.flat[0]) == pytest.approx(G_IAPWS95, abs=1e-8)
+    assert float(out.S.flat[0]) == pytest.approx(S_IAPWS95, abs=1e-9)
+    assert float(out.G.flat[0]) == pytest.approx(float(ref.G.flat[0]), abs=1e-5)
+    assert float(out.S.flat[0]) == pytest.approx(float(ref.S.flat[0]), abs=1e-6)
+
+
+@pytest.mark.parametrize('backend', ['numpy', 'rust'])
+def test_reference_state_is_common_to_mixture_and_states(backend):
+    """The offsets shift the mixture and both pure states alike.
+
+    Differences between the three Gibbs energies and entropies are fixed by
+    the two-state parameters alone, so they must not contain the offsets,
+    and H, U and A must be built from the aligned G and S.
+    """
+    T = np.array([200.0, 235.0, 273.15, 298.15, 320.0])
+    P = np.array([-50.0, 0.1, 0.1, 100.0, 200.0])
+    out = _backend_batch(backend)(T, P)
+
+    per_kg = STP.R / (STP.N_UNIT * STP.M_H2O)          # J/(kg K) per kB
+    delta_g = per_kg * STP.Tr * (STP.DELTA_E_HAT
+                                 - (T / STP.Tr) * STP.DELTA_SIGMA_HAT
+                                 + (P / STP.Pr) * STP.DELTA_V_HAT)
+    np.testing.assert_allclose(out['G_B'] - out['G_A'], delta_g,
+                               rtol=1e-9, atol=1e-6)
+    np.testing.assert_allclose(out['S_B'] - out['S_A'],
+                               per_kg * STP.DELTA_SIGMA_HAT * np.ones_like(T),
+                               rtol=1e-9, atol=1e-9)
+    # Ideal mixing at equilibrium: G = G_A + kB T ln(1 - s) per unit
+    np.testing.assert_allclose(out['G'] - out['G_A'],
+                               per_kg * T * np.log1p(-out['x']),
+                               rtol=1e-9, atol=1e-6)
+
+    p_Pa = P * 1e6
+    for sfx in ('', '_A', '_B'):
+        G, S, V = out['G' + sfx], out['S' + sfx], out['V' + sfx]
+        np.testing.assert_allclose(out['H' + sfx], G + T * S,
+                                   rtol=1e-12, atol=1e-6)
+        np.testing.assert_allclose(out['U' + sfx], G + T * S - p_Pa * V,
+                                   rtol=1e-12, atol=1e-6)
+        np.testing.assert_allclose(out['A' + sfx], G - p_Pa * V,
+                                   rtol=1e-12, atol=1e-6)

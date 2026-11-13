@@ -285,7 +285,7 @@ def compute_batch(T_K, P_MPa):
     rho_B, V_B, S_B, G_B, Cp_B, Cv_B, Kt_B, Ks_B, alpha_B, vel_B = _physical_vec(
         Vh_B, Sh_B, d2Grho_dP2, d2Grho_dT2, d2Grho_dPdT, G_hat_B, T_K)
 
-    # ── IAPWS-95 reference state alignment (no-op until calibrated) ────
+    # ── IAPWS-95 reference state alignment ─────────────────────────────
     for S_arr, G_arr in [(S, G), (S_A, G_A), (S_B, G_B)]:
         S_arr += P.S_OFFSET
         G_arr += P.H_OFFSET - T_K * P.S_OFFSET
