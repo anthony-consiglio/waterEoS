@@ -461,3 +461,41 @@ class TestAgainstIapws:
         V_ideal = R * 373.15 / (st.P * 1e6)
         assert abs(V_ideal / st.v - 1) > 1.5e-2      # ideal gas: 1.6 % off
         assert abs(V / st.v - 1) < 1e-4
+
+
+# ───────────────────────────────────────────────────────────────────────
+# 7. The vapor branch of the T-V phase diagram
+# ───────────────────────────────────────────────────────────────────────
+
+class TestPhaseDiagramBranch:
+    def test_branch_starts_on_the_common_tangent(self):
+        from watereos.tv_phase_diagram import _evaluate_vapor
+        T = np.array([200.0, 250.0, 273.0, 280.0, 350.0])
+        d = _evaluate_vapor(T, n_V=12, V_max_factor=100.0)
+        assert d['T_mask'].all()
+        assert d['V'].shape == d['A'].shape == d['P'].shape == (12, 5)
+        # first sample: coexistence with ice Ih (below the triple point)
+        # or with the liquid; G = A + P V equals the condensed phase's G
+        p0 = d['P'][0]
+        np.testing.assert_allclose(p0[:3], vapor_pressure(T[:3], 'Ih'), rtol=1e-12)
+        np.testing.assert_allclose(p0[3:], vapor_pressure(T[3:], 'water1'), rtol=1e-12)
+        G0 = d['A'][0] + p0 * 1e6 * d['V'][0]
+        G_cond = np.concatenate([_condensed_G('Ih', T[:3], p0[:3]),
+                                 _condensed_G('water1', T[3:], p0[3:])])
+        np.testing.assert_allclose(G0, G_cond, rtol=0, atol=1e-6)
+        # the branch runs to 100 times lower pressure, volume increasing
+        np.testing.assert_allclose(d['P'][0] / d['P'][-1], 100.0, rtol=1e-12)
+        assert np.all(np.diff(d['V'], axis=0) > 0)
+
+    def test_diagram_coexistence_pressures(self):
+        pytest.importorskip("iapws", reason="the diagram's overlay curves need iapws")
+        from watereos.tv_phase_diagram import compute_tv_phase_diagram
+        d = compute_tv_phase_diagram(T_min=250.0, T_max=300.0, dT=5.0, verbose=False)
+        bounds = {tuple(str(x) for x in k): v for k, v in d['two_phase_bounds'].items()}
+        ice, liq = bounds[('Ih', 'vapor')], bounds[('water1', 'vapor')]
+        on_grid = np.isclose(ice['T'] % 5.0, 0.0)
+        np.testing.assert_allclose(ice['P_coex'][on_grid],
+                                   sublimation_pressure(ice['T'][on_grid]), rtol=2e-4)
+        on_grid = np.isclose(liq['T'] % 5.0, 0.0)
+        np.testing.assert_allclose(liq['P_coex'][on_grid],
+                                   saturation_pressure(liq['T'][on_grid]), rtol=2e-4)
