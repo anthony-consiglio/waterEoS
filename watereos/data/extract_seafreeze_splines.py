@@ -3,6 +3,13 @@
 Run once per SeaFreeze upgrade to regenerate the bundled spline file.
 The output is consumed at runtime by watereos_rs::seafreeze.
 
+Needs SeaFreeze >= 1.1, which keeps one .mat file per material under
+seafreeze/splines/. The bundled file was last generated from SeaFreeze
+1.1.3. Against the 1.0.0 extraction the spline knots and coefficients of
+all eight phases are bit-identical; only the shear modulus parameters of
+ice Ih differ ([3.04, -0.00462, 0, -0.00607, 1000, 273.15] in 1.0.0,
+[3.1, -0.00462, 0, -0.00657, 1000, 273.15] since 1.1.0).
+
 Binary layout (all little-endian):
     HEADER
       magic        4 bytes   b"WSF1"
@@ -47,8 +54,11 @@ PHASES_TO_EXTRACT = [
 
 
 def main():
-    from mlbspline.load import loadSpline
-    from seafreeze.seafreeze import defpath, phases as sf_phases
+    from importlib.metadata import version
+
+    from seafreeze import seafreeze as sf
+
+    print(f"Extracting from SeaFreeze {version('SeaFreeze')}")
 
     out_path = Path(__file__).parent / "seafreeze_splines.bin"
     buf = bytearray()
@@ -57,8 +67,9 @@ def main():
     buf.extend(struct.pack("<H", len(PHASES_TO_EXTRACT)))
 
     for name in PHASES_TO_EXTRACT:
-        descriptor = sf_phases[name]
-        sp = loadSpline(defpath, descriptor.sp_name)
+        descriptor = sf.phases[name]
+        # The per-material loader is the one getProp itself uses.
+        sp = sf._load_spline(sf.defpath, name)
 
         assert sp["number"].size == 2, f"{name}: not a 2D spline"
         n_basis_P, n_basis_T = int(sp["number"][0]), int(sp["number"][1])

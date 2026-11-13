@@ -9,10 +9,25 @@ on:
 jobs:
   test:
     name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      # Let each Python version report on its own; with fail-fast a failure
+      # in one leg cancels the other before it has run a single test.
+      fail-fast: false
       matrix:
-        python-version: ["3.9", "3.12"]
+        include:
+          # 3.9 is the floor declared in pyproject.toml (requires-python) and
+          # the ABI of the published wheels (cp39-abi3). setup-python has no
+          # 3.9 build for Ubuntu 26.04, the image behind ubuntu-latest, so
+          # this leg stays on 24.04. The web backend (watereos_api, not part
+          # of the wheel) uses `X | None` annotations and needs Python 3.10
+          # or later, so its tests are left out of this leg.
+          - python-version: "3.9"
+            os: ubuntu-24.04
+            pytest-args: "--ignore-glob='tests/test_api_*.py'"
+          - python-version: "3.12"
+            os: ubuntu-latest
+            pytest-args: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -28,4 +43,6 @@ jobs:
         run: pip install ".[dev,web,tv]"
 
       - name: Run tests
-        run: pytest tests/ -q
+        # `python -m pytest` puts the checkout on sys.path. watereos_api is
+        # not installed with the package, so a bare `pytest` cannot import it.
+        run: python -m pytest tests/ -q ${{ matrix.pytest-args }}
