@@ -38,9 +38,14 @@ def PT_scatter():
 
 def test_list_models():
     from watereos import list_models
+    from watereos.model_registry import MODEL_REGISTRY, model_water_keys
     models = list_models()
     assert isinstance(models, list)
-    assert len(models) == 13
+    # Real water; the equations fitted to model waters come on top
+    real = [m for m in models if not MODEL_REGISTRY[m].is_model_water]
+    assert len(real) == 15
+    assert 'moynihan1996species' in real and 'mishima2023equation' in real
+    assert sorted(set(models) - set(real)) == sorted(model_water_keys())
     assert 'duska2020' in models
     assert 'caupin2019' in models
     assert 'singh2017_caupin2019' in models

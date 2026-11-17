@@ -23,6 +23,7 @@ _BASE_CATEGORY = {
     'Kt': 'bulk_modulus', 'Ks': 'bulk_modulus',
     'Kp': None, 'alpha': None, 'vel': None, 'x': None,
     'eta': 'viscosity', 'D': None, 'tau_r': None, 'f': None,
+    'Cp_ex': 'entropy',
 }
 
 PROP_CATEGORY = dict(_BASE_CATEGORY)

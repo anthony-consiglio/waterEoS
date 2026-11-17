@@ -1,11 +1,9 @@
 """
 waterEoS — thermodynamic properties of supercooled water.
 
-Provides a unified interface to ten equation-of-state and transport
-models for liquid water, including four primary two-state thermodynamic
-EoS authors (Holten 2014, Caupin 2019 with optional Kim variant,
-Duska 2020, Shi & Tanaka 2020) that predict a liquid--liquid critical
-point (LLCP) in the deeply supercooled regime.
+Provides a unified interface to equations of state and transport
+models for water, including partial models from the literature and
+equations fitted to simulations of model waters.
 
 Quick start
 -----------
@@ -27,9 +25,9 @@ Or ``getProp()`` for SeaFreeze-compatible grid/scatter input::
 Available models: ``'holten2014'``, ``'caupin2019'``, ``'caupin2019_kim'``,
 ``'duska2020'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
 ``'grenke2025'``, ``'singh2017'``, ``'singh2017_caupin2019'``,
-``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``, and ``'vapor'``
-(water vapor on the same reference state, so that its Gibbs energy can be
-compared with the liquids and with the SeaFreeze ices).
+``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``, ``'vapor'``,
+``'moynihan1996species'``, and ``'mishima2023equation'``, along with the
+published model-water fits returned by ``list_models()``.
 
 See ``watereos.model_registry.MODEL_REGISTRY`` for metadata on each model,
 or call ``list_models()`` for a quick summary. Call ``backend()`` to see
@@ -38,7 +36,7 @@ which backend (Rust/JAX/numpy) is dispatching each two-state model.
 
 from .watereos import getProp, list_models, compute
 from .tv_phase_diagram import compute_tv_phase_diagram, compute_isochore
-from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo
+from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo, model_water_keys
 
 # One-time warning if the Rust backend failed to import. Without Rust the
 # two-state models silently fall back to JAX (if installed) or pure-Python
@@ -58,14 +56,13 @@ except ImportError:
 
 
 def backend(model=None):
-    """Return which backend (rust/jax/numpy) is being used per two-state model
-    and for the vapor.
+    """Return the active backend (rust/jax/numpy) for supported models.
 
     Parameters
     ----------
     model : str or None
-        If None (default), return a dict mapping every two-state model key
-        (and ``'vapor'``) to its active backend string. Otherwise return
+        If None (default), return a dict mapping backend-aware model keys
+        to their active backend strings. Otherwise return
         the backend string for the named model (e.g. ``'caupin2019'``,
         ``'holten2014'``, ``'duska2020'``, ``'caupin2019_kim'``).
 
@@ -113,6 +110,8 @@ def backend(model=None):
                 result[mkey] = 'unknown'
         except Exception as exc:
             result[mkey] = f'error: {exc}'
+    for key in ['moynihan1996species', 'mishima2023equation', *model_water_keys()]:
+        result[key] = 'numpy'
     if model is None:
         return result
     return result.get(model, 'unknown')

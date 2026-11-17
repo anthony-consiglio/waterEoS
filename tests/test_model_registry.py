@@ -145,12 +145,12 @@ class TestFlags:
 
     @pytest.mark.parametrize("model_key", list(MODEL_REGISTRY.keys()))
     def test_transport_flag_matches_properties(self, model_key):
-        """has_transport=True iff transport properties (eta, D) are declared."""
+        """The transport flag tracks the available transport observables."""
         info = MODEL_REGISTRY[model_key]
-        has_eta = 'eta' in info.properties
-        assert info.has_transport == has_eta, (
+        has_transport_props = any(k in info.properties for k in ('eta', 'D', 'tau_r'))
+        assert info.has_transport == has_transport_props, (
             f"{model_key}: has_transport={info.has_transport} but "
-            f"'eta' {'in' if has_eta else 'not in'} properties"
+            f"transport property present: {has_transport_props}"
         )
 
     def test_phase_diagram_models_have_functions(self):
