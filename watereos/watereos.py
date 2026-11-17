@@ -16,6 +16,12 @@ Provides a single ``getProp(PT, model)`` interface that dispatches to:
   - ``'singh2017_caupin2019'`` -- same, refit with the Caupin (2019) backbone
   - ``'singh2017_duska2020'``  -- same, refit with the Duska (2020) backbone
   - ``'vapor'``          -- water vapor (IAPWS-95 ideal gas + virial terms)
+  - ``'moynihan1996species'`` -- Moynihan (1996) two-species model
+  - ``'mishima2023equation'`` -- Mishima & Sumita (2023) volume
+
+and the equations fitted to simulations of model waters,
+whose keys are listed by ``watereos.model_registry.model_water_keys()`` and
+implemented in the ``model_water_eos`` package.
 """
 
 import warnings
@@ -23,20 +29,42 @@ import warnings
 import numpy as np
 
 from watereos._common import _is_grid_input
-from watereos.model_registry import MODEL_REGISTRY
+from watereos.model_registry import MODEL_REGISTRY, model_water_keys
 from watereos.two_state_branch import normalize_branch
+
+# Equations fitted to simulations of model waters (package model_water_eos)
+_MODEL_WATERS = model_water_keys()
 
 _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
            'duska2020', 'grenke2025', 'singh2017',
            'singh2017_caupin2019', 'singh2017_duska2020',
-           'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor']
+           'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor',
+           'moynihan1996species', 'mishima2023equation'] + _MODEL_WATERS
+
 
 # Models whose liquid can be followed on a named branch (regular-mixture
-# two-state EoS, and the transport model built on them)
+# two-state EoS, and the transport model built on them).  The model-water
+# keys that support it are looked up in model_water_eos when needed, which
+# keeps that package out of the import of watereos.
 _BRANCH_MODELS = frozenset([
     'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
     'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
+    'moynihan1996species',
 ])
+
+
+def _supports_branch(model):
+    if model in _BRANCH_MODELS:
+        return True
+    if model in _MODEL_WATERS:
+        from model_water_eos import BRANCH_MODELS
+        return model in BRANCH_MODELS
+    return False
+
+
+def _branch_models():
+    return [m for m in _MODELS if _supports_branch(m)]
+
 
 # Case-insensitive lookup  ->  canonical name
 _CANONICAL = {name.lower(): name for name in _MODELS}
@@ -142,8 +170,9 @@ def getProp(PT, model, branch='stable'):
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
         'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
-        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor'.
-        Matching is case-insensitive.
+        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor',
+        'moynihan1996species', 'mishima2023equation', or a model-water key.
+        See ``list_models()`` for the complete list. Matching is case-insensitive.
     branch : {'stable', 'hdl', 'ldl'}, optional
         Below the liquid-liquid critical point the two-state models have
         two liquid states over part of the (T, P) plane.  ``'stable'``
@@ -157,7 +186,8 @@ def getProp(PT, model, branch='stable'):
         gives the smooth metastable extension of the liquid through
         the transition.
         Supported by 'holten2014', 'caupin2019', 'caupin2019_kim',
-        'duska2020' and the 'singh2017*' transport models.
+        'duska2020', 'moynihan1996species', the 'singh2017*' transport models and
+        the two-state model-water equations.
 
     Returns
     -------
@@ -177,11 +207,10 @@ def getProp(PT, model, branch='stable'):
         raise ValueError(
             f"Unknown model '{model}'. Choose from: {', '.join(_MODELS)}"
         )
-    if branch != 'stable' and canonical not in _BRANCH_MODELS:
+    if branch != 'stable' and not _supports_branch(canonical):
         raise ValueError(
             f"branch='{branch}' is not available for model '{canonical}'. "
-            f"Models with branch selection: "
-            f"{', '.join(m for m in _MODELS if m in _BRANCH_MODELS)}"
+            f"Models with branch selection: {', '.join(_branch_models())}"
         )
 
     if canonical == 'water1':
@@ -236,6 +265,18 @@ def getProp(PT, model, branch='stable'):
         from vapor_eos import getProp as _gp
         return _gp(PT)
 
+    if canonical == 'moynihan1996species':
+        from moynihan_eos import getProp as _gp
+        return _gp(PT, branch=branch)
+
+    if canonical == 'mishima2023equation':
+        from mishima_eos import getProp as _gp
+        return _gp(PT)
+
+    if canonical in _MODEL_WATERS:
+        from model_water_eos import getProp as _gp
+        return _gp(PT, canonical, branch=branch)
+
 
 def compute(T_K, P_MPa, model, branch='stable'):
     """Compute thermodynamic properties for water.
@@ -253,8 +294,9 @@ def compute(T_K, P_MPa, model, branch='stable'):
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
         'caupin2019_kim', 'duska2020', 'shi_tanaka2020',
         'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
-        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor'.
-        Matching is case-insensitive.
+        'singh2017_caupin2019', 'singh2017_duska2020', 'vapor',
+        'moynihan1996species', 'mishima2023equation', or a model-water key.
+        See ``list_models()`` for the complete list. Matching is case-insensitive.
     branch : {'stable', 'hdl', 'ldl'}, optional
         Liquid branch of a two-state model; see ``getProp``.
 

@@ -49,7 +49,7 @@ Homepage = "https://github.com/anthony-consiglio/waterEoS"
 Issues = "https://github.com/anthony-consiglio/waterEoS/issues"
 
 [tool.setuptools.packages.find]
-include = ["watereos*", "watereos_ad*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*", "shi_tanaka_eos*", "shi_tanaka_transport*", "vapor_eos*"]
+include = ["watereos*", "watereos_ad*", "duska_eos*", "caupin_eos*", "holten_eos*", "grenke_eos*", "singh_viscosity*", "shi_tanaka_eos*", "shi_tanaka_transport*", "vapor_eos*", "moynihan_eos*", "mishima_eos*", "model_water_eos*"]
 exclude = ["tests*", "examples*", "watereos_api*"]
 
 [tool.setuptools.package-data]
@@ -67,4 +67,6 @@ python-packages = [
     "singh_viscosity",
     "shi_tanaka_eos", "shi_tanaka_transport",
     "vapor_eos",
+    "moynihan_eos", "mishima_eos",
+    "model_water_eos",
 ]

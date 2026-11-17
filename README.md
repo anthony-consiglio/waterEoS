@@ -110,6 +110,11 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'water1'` | SeaFreeze water1 (pass-through) | -- |
 | `'IAPWS95'` | SeaFreeze IAPWS-95 (pass-through) | -- |
 | `'vapor'` | Water vapor: IAPWS-95 ideal gas + second and third virial terms (Wagner & Pruß, 2002) | -- (vapor) |
+| `'moynihan1996species'` | Moynihan, MRS Proc. **455**, 411 (1996). Two-species fraction, excess responses, and approximate volume. | 217.09 K, 38.12 MPa |
+| `'mishima2023equation'` | Mishima & Sumita, J. Phys. Chem. B **127**, 1414 (2023). Case 3, 7 × 7 volume polynomial. | 203.70 K, 113.71 MPa |
+
+See [Literature models](docs/literature-models.md) for property support,
+published-value checks, and the keys for simulation-fitted model waters.
 
 ### Validity Ranges
 
@@ -128,6 +133,8 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'singh2017'` | 244&ndash;298 K (limited by homogeneous ice nucleation) | Unbounded (any T, P) |
 | `'IAPWS95'` | 240&ndash;501 K, 0&ndash;2300 MPa | Enforced by SeaFreeze |
 | `'vapor'` | 130&ndash;400 K, from zero pressure to saturation / sublimation and moderately beyond (0.25 MPa at 400 K) | Any T, P > 0; NaN where the virial series has no meaning (far beyond saturation) |
+| `'moynihan1996species'` | Supercooled-liquid responses around 236&ndash;277 K up to 100 MPa, plus the 135 K transformation pressures | Positive T. Off-fit evaluations are extrapolations. |
+| `'mishima2023equation'` | Liquid data at roughly 200&ndash;500 K and −100&ndash;1000 MPa, plus amorphous-ice volumes around 135&ndash;152 K | Stable roots in 0.70&ndash;1.25 cm³/g. The rectangular plotting bounds include extrapolations. |
 
 **Notes:**
 - T_H(P) is the homogeneous ice nucleation temperature (~235 K at 0.1 MPa, ~181 K at 200 MPa).
