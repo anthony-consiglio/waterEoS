@@ -322,6 +322,33 @@ MODEL_REGISTRY = {
     ),
 }
 
+# Pure-water SAFT variants use the single dense-fluid branch.
+_PCSAFT_NAMES = {
+    'pcsaft_water': 'PC-SAFT water (Diamantonis–Economou)',
+    'novak2024_pcsaft_ts_tv': 'Novak (2024), PC-SAFT-TS-TV',
+    'novak2024_pcsaft_ts_t': 'Novak (2024), PC-SAFT-TS-T',
+    'novak2025_pcsaft_ts_caf': 'Novak (2025), PC-SAFT-TS-CAF',
+}
+_PCSAFT_PROPS = [p for p in EMPIRICAL_PROPS if p != 'Kp']
+for key, name in _PCSAFT_NAMES.items():
+    two_state = key != 'pcsaft_water'
+    MODEL_REGISTRY[key] = ModelInfo(
+        display_name=name,
+        model_key=key,
+        is_two_state=two_state,
+        has_phase_diagram=False,
+        has_transport=False,
+        T_min=273.16, T_max=703.16,
+        P_min=0.1, P_max=400.0,
+        properties=_PCSAFT_PROPS + (['x'] if two_state else []),
+    )
+
+
+def pcsaft_keys():
+    """Selectable pure-water PC-SAFT models."""
+    return list(_PCSAFT_NAMES)
+
+
 # --- Equations fitted to simulations of model waters ------------------------
 # These describe the named water potential, not real water. Each display
 # name says so, and ``water_model`` names the potential. Ranges are the
@@ -395,7 +422,7 @@ MODEL_ORDER = [
     'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
     'moynihan1996species', 'mishima2023equation',
     'water1', 'IAPWS95', 'vapor',
-] + list(_MODEL_WATERS)
+] + pcsaft_keys() + list(_MODEL_WATERS)
 
 
 def model_water_keys():

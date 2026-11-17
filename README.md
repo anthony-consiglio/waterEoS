@@ -112,9 +112,14 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'vapor'` | Water vapor: IAPWS-95 ideal gas + second and third virial terms (Wagner & Pruß, 2002) | -- (vapor) |
 | `'moynihan1996species'` | Moynihan, MRS Proc. **455**, 411 (1996). Two-species fraction, excess responses, and approximate volume. | 217.09 K, 38.12 MPa |
 | `'mishima2023equation'` | Mishima & Sumita, J. Phys. Chem. B **127**, 1414 (2023). Case 3, 7 × 7 volume polynomial. | 203.70 K, 113.71 MPa |
+| `'pcsaft_water'` | Diamantonis–Economou PC-SAFT water, reproduced in Novak et al. (2024), Table II | — |
+| `'novak2024_pcsaft_ts_tv'` | Novak et al. (2024) PC-SAFT-TS with temperature- and volume-dependent composition | — |
+| `'novak2024_pcsaft_ts_t'` | Novak et al. (2024) PC-SAFT-TS with temperature-dependent composition, parameters from Novak et al. (2025), Table 1 | — |
+| `'novak2025_pcsaft_ts_caf'` | Novak et al. (2025) PC-SAFT-TS with fitted cross-association | — |
 
 See [Literature models](docs/literature-models.md) for property support,
-published-value checks, and the keys for simulation-fitted model waters.
+published-value checks, and the keys for simulation-fitted model waters. See
+[Pure-water PC-SAFT](docs/pcsaft-water.md) for parameter tables and benchmarks.
 
 ### Validity Ranges
 

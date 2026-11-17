@@ -36,7 +36,7 @@ which backend (Rust/JAX/numpy) is dispatching each two-state model.
 
 from .watereos import getProp, list_models, compute
 from .tv_phase_diagram import compute_tv_phase_diagram, compute_isochore
-from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo, model_water_keys
+from .model_registry import MODEL_REGISTRY, MODEL_ORDER, ModelInfo, model_water_keys, pcsaft_keys
 
 # One-time warning if the Rust backend failed to import. Without Rust the
 # two-state models silently fall back to JAX (if installed) or pure-Python
@@ -110,7 +110,7 @@ def backend(model=None):
                 result[mkey] = 'unknown'
         except Exception as exc:
             result[mkey] = f'error: {exc}'
-    for key in ['moynihan1996species', 'mishima2023equation', *model_water_keys()]:
+    for key in ['moynihan1996species', 'mishima2023equation', *model_water_keys(), *pcsaft_keys()]:
         result[key] = 'numpy'
     if model is None:
         return result

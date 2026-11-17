@@ -29,7 +29,7 @@ import warnings
 import numpy as np
 
 from watereos._common import _is_grid_input
-from watereos.model_registry import MODEL_REGISTRY, model_water_keys
+from watereos.model_registry import MODEL_REGISTRY, model_water_keys, pcsaft_keys
 from watereos.two_state_branch import normalize_branch
 
 # Equations fitted to simulations of model waters (package model_water_eos)
@@ -39,7 +39,7 @@ _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
            'duska2020', 'grenke2025', 'singh2017',
            'singh2017_caupin2019', 'singh2017_duska2020',
            'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor',
-           'moynihan1996species', 'mishima2023equation'] + _MODEL_WATERS
+           'moynihan1996species', 'mishima2023equation'] + pcsaft_keys() + _MODEL_WATERS
 
 
 # Models whose liquid can be followed on a named branch (regular-mixture
@@ -272,6 +272,10 @@ def getProp(PT, model, branch='stable'):
     if canonical == 'mishima2023equation':
         from mishima_eos import getProp as _gp
         return _gp(PT)
+
+    if canonical in pcsaft_keys():
+        from pcsaft_eos import getProp as _gp
+        return _gp(PT, canonical)
 
     if canonical in _MODEL_WATERS:
         from model_water_eos import getProp as _gp
