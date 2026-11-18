@@ -17,6 +17,7 @@
 Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich).
 
 - **Bridge29 (Tony Consiglio)** connects liquid and amorphous water through a two-state Gibbs energy. The low-density state is referenced to ice Ih, and the high-density state includes a liquid–vapor stability limit. The model predicts a liquid–liquid critical point at 222.34 K and 47.65 MPa. A separate dynamic fraction governs viscosity, self-diffusion, and rotational relaxation. [Python example](#bridge29-thermodynamics-and-transport)
+- **Local26 (Tony Consiglio)** is Bridge29's Gibbs equation refitted to liquid water alone, at 175–300 K and −50 to 250 MPa, with 26 coefficients. It predicts a liquid–liquid critical point at 218.73 K and 56.66 MPa. It has no transport model, and its high-density state ends at 302.4 K. [Python example](#local26)
 - **Holten, Sengers & Anisimov (2014)** -- The foundational two-state EOS for supercooled water. Uses a Gibbs-energy (pressure-additive) mixing rule, fitted to experimental data at positive pressures up to 400 MPa. Places the LLCP at 228 K, 0 MPa.
 - **Caupin & Anisimov (2019)** -- Extends the two-state framework to negative pressures (stretched water), connecting the liquid-liquid spinodal to the liquid-vapor spinodal in a unified description. Places the LLCP at 218 K, 72 MPa. An optional `caupin2019_kim` variant uses the with-Kim parameter set from Table II of the same paper, which incorporates the Kim et al. (2017) X-ray scattering data and places the LLCP at 219 K, 59 MPa.
 - **Duska (2020)** -- Uses a volume-additive mixing rule (rather than Gibbs-energy mixing), yielding an explicit equation of state in volume and temperature ("EOS-VaT"). Fitted over a broader temperature range up to 370 K. Places the LLCP at 221 K, 54 MPa.
@@ -35,7 +36,7 @@ These models return the equilibrium low-density fraction `x`, mixture properties
 
 ## Web App
 
-To see Bridge29, open **EoS Phase Diagram** and select **Bridge29 (Consiglio)** in the model menu. **Property Explorer** plots its isobars and isotherms, and **Point Calculator** reports both the equilibrium and dynamic fractions at a specified temperature and pressure. [Open the waterEoS visualizer](https://watereos-visualizer.up.railway.app)
+To see Bridge29, open **EoS Phase Diagram** and select **Bridge29 (Consiglio)** in the model menu. **Property Explorer** plots its isobars and isotherms, and **Point Calculator** reports both the equilibrium and dynamic fractions at a specified temperature and pressure. **Local26 (Consiglio)** appears in the same menus. [Open the waterEoS visualizer](https://watereos-visualizer.up.railway.app)
 
 The web app includes a Property Explorer, an EoS phase diagram viewer (per two-state model, 100&ndash;375 K and &minus;400 to 420 MPa: liquid-liquid coexistence, critical point and stability limits, Widom line, liquid-vapor stability limit and coexistence, homogeneous nucleation, model melting lines of ices Ih, III and V, maxima and minima of density, compressibility, sound speed and heat capacity, and measured reference points), an **H₂O + NaCl phase diagram** atlas (the phase equilibria of water and its NaCl solutions in pressure, temperature, specific volume and composition, from 1 Pa to 400 MPa above 229 K: liquid, ices Ih, II, III, V and VI, and vapor; isothermal, isobaric, isochoric and isoplethal sections, the same sections as surfaces, the equilibrium complex in 3-D and the convex-hull construction it comes from; at zero NaCl the diagrams are those of pure water), a measured-data browser, a model comparison tool, and a point calculator.
 
@@ -110,6 +111,7 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'caupin2019_kim'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019), Table II (with-Kim variant); Kim et al., Science **358**, 1589 (2017) | 219.47 K, 58.74 MPa |
 | `'bridge29'` | Tony Consiglio, *Bridging liquid and amorphous water with a broadly constrained equation of state and a transport model* (manuscript) | 222.34 K, 47.65 MPa |
+| `'local26'` | Tony Consiglio, Bridge29's equation (same manuscript) refitted to liquid water at 175–300 K and −50 to 250 MPa | 218.73 K, 56.66 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
 | `'shi_tanaka2020'` | Shi & Tanaka, PNAS **117**, 26591 (2020) | 184 K, 173 MPa |
 | `'shi_tanaka2020_transport'` | Shi & Tanaka, PNAS **117**, 26591 (2020), Tables S2/S3 (transport) | 184 K, 173 MPa |
@@ -139,6 +141,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'caupin2019'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'caupin2019_kim'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'bridge29'` | 100&ndash;400 K, −200 to 400 MPa (suggested plotting window, includes extrapolation) | Positive T and a physical high-density reference state above the liquid–vapor spinodal |
+| `'local26'` | 175&ndash;300 K, −50 to 250 MPa (calibration window) | T up to 302.4 K and a physical high-density state, as for Bridge29 |
 | `'duska2020'` | ~200&ndash;370 K, ~-150 to 400 MPa (paper-validated 0&ndash;100 MPa; degrades at negative P) | Unbounded (any T, P) |
 | `'shi_tanaka2020'` | ~180&ndash;320 K, -110 to 200 MPa (paper-validated; agrees with IAPWS-95 to ~0.05% in ρ and a few % in κ_T, α, Cp across the liquid range) | Unbounded (any T, P) |
 | `'shi_tanaka2020_transport'` | ~180&ndash;320 K, -110 to 200 MPa (η, D, τ_R coupled to the same hierarchical two-state framework) | Unbounded (any T, P) |
@@ -295,6 +298,17 @@ print(water.x.item(), water.f.item())    # 0.19864 and 0.07328
 
 The Gibbs energy determines the equilibrium LDL fraction `x`. A separate dynamic fraction `f` controls viscosity `eta` (Pa·s), self-diffusion `D` (m²/s), and rotational correlation time `tau_r` (s). The transport coefficients come from the manuscript’s selected quadratic pressure dependence of the crossover temperature. Below the homogeneous nucleation line the liquid branches are model continuations constrained by amorphous-water measurements. Select **Bridge29 (Consiglio)** in the visualizer to calculate a point, compare models, explore properties, or plot its phase diagram.
 
+### Local26
+
+```python
+from watereos import compute
+
+water = compute(T_K=250.0, P_MPa=0.1, model="local26")
+print(water.rho.item(), water.x.item())  # 991.224 kg/m³ and 0.16760
+```
+
+Local26 uses Bridge29's Gibbs equation (`watereos/bridge29/equation.py`) with the coefficients in `watereos/data/local26.json`. They were fitted to 4,452 liquid observations at 175–300 K and −50 to 250 MPa, without Bridge29's amorphous-water constraints. The low-density oscillator and the 500 K high-density oscillator are fixed at zero. Outside the calibration window the model is an extrapolation, and `getProp` warns. Above 302.4 K the curvature of the high-density state's spinodal expansion changes sign, so that state and every mixture property are `NaN`. Local26 has no transport model.
+
 ### List Available Models
 
 ```python
@@ -332,7 +346,7 @@ Each property above (except `x`) is also available for the individual states wit
 - `rho_A`, `Cp_A`, `vel_A`, ... (State A: high-density / disordered)
 - `rho_B`, `Cp_B`, `vel_B`, ... (State B: low-density / tetrahedral)
 
-Bridge29 returns `NaN` for `Kp`, `Kp_A`, and `Kp_B`.
+Bridge29 and Local26 return `NaN` for `Kp`, `Kp_A`, and `Kp_B`.
 
 All thermodynamic potentials (S, G, H, U, A) are aligned to the IAPWS-95 reference state.
 
@@ -365,7 +379,7 @@ Available functions: `find_LLCP()`, `compute_spinodal_curve()`, `compute_binodal
 
 ### EoS phase diagram figure
 
-`watereos.eos_phase_diagram` computes and draws the phase diagram shown in the visualizer's EoS Phase Diagram tab, for `bridge29`, `caupin2019`, `caupin2019_kim`, `duska2020` and `holten2014`. One panel, 100&ndash;375 K and &minus;400 to 420 MPa:
+`watereos.eos_phase_diagram` computes and draws the phase diagram shown in the visualizer's EoS Phase Diagram tab, for `bridge29`, `local26`, `caupin2019`, `caupin2019_kim`, `duska2020` and `holten2014`. One panel, 100&ndash;375 K and &minus;400 to 420 MPa:
 
 - the liquid-liquid coexistence line, its critical point, and the stability limits of the high- and low-density liquids;
 - the Widom line, where the two liquid fractions are equal above the critical point;
@@ -419,7 +433,7 @@ ldl.x[0]           # [  nan   nan 0.760 0.810 0.842 0.866]
 
 - Where the requested liquid does not exist (beyond its spinodal, or on the other side of the line `x` = 1/2 that continues the transition past the critical point), the mixture properties are `NaN`. The per-state properties (`_A`, `_B`) do not depend on the branch.
 - With `'hdl'` or `'ldl'` the output also has `metastable`, a boolean array that is `True` where the returned liquid is not the one with the lowest Gibbs energy. The transition is where it switches.
-- Available for `bridge29`, `holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`, and for the `singh2017*` transport models, where it selects the branch of the backbone that supplies the LDS fraction. Other models raise `ValueError` for a non-default branch.
+- Available for `bridge29`, `local26`, `holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`, and for the `singh2017*` transport models, where it selects the branch of the backbone that supplies the LDS fraction. Other models raise `ValueError` for a non-default branch.
 - The Rust and NumPy backends both implement it; the JAX path falls back to NumPy for a non-default branch.
 
 ### H₂O solid-liquid-vapor phase diagram
@@ -546,7 +560,7 @@ these outputs; `grenke2025`, `water1`, and `IAPWS95` do not.
 
 The Rust backend is selected automatically when the compiled extension
 is available (included in pre-built PyPI wheels). It covers the two-state
-models `bridge29`, `holten2014`, `caupin2019`, `caupin2019_kim`,
+models `bridge29`, `local26`, `holten2014`, `caupin2019`, `caupin2019_kim`,
 `duska2020` and `shi_tanaka2020`, water vapor, and the SeaFreeze ice
 phases. To check:
 

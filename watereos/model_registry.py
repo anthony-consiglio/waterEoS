@@ -184,6 +184,14 @@ MODEL_REGISTRY = {
         T_min=100, T_max=400, P_min=-200, P_max=400,
         properties=[k for k in TRANSPORT_PROPS if k.split('_')[0] != 'Kp'],
     ),
+    'local26': ModelInfo(
+        display_name='Local26 (Consiglio)',
+        model_key='local26', is_two_state=True, has_phase_diagram=True, has_transport=False,
+        # The calibration window. Beyond it the equation is an extrapolation,
+        # and above 302.4 K its high-density state does not exist.
+        T_min=175, T_max=300, P_min=-50, P_max=250,
+        properties=[k for k in TWO_STATE_PROPS if k.split('_')[0] != 'Kp'],
+    ),
     'duska2020': ModelInfo(
         display_name='Duska (2020)',
         model_key='duska2020',
@@ -423,7 +431,7 @@ MODEL_REGISTRY.update(_MODEL_WATERS)
 
 # Ordered list for consistent UI display: real water first, model waters last
 MODEL_ORDER = [
-    'duska2020', 'bridge29', 'holten2014', 'caupin2019', 'caupin2019_kim',
+    'duska2020', 'bridge29', 'local26', 'holten2014', 'caupin2019', 'caupin2019_kim',
     'shi_tanaka2020', 'shi_tanaka2020_transport',
     'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
     'moynihan1996species', 'mishima2023equation',
