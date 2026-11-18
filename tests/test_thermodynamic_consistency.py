@@ -178,6 +178,33 @@ def test_duska_pure_states_are_consistent(suffix):
     assert np.abs(dG_dp / o['V' + suffix] - 1.0).max() < V_RTOL
 
 
+@pytest.mark.parametrize('suffix', ['_A', '_B'])
+@pytest.mark.parametrize('backend', ['numpy', 'rust'])
+def test_duska_pure_state_heat_capacity(suffix, backend):
+    """Cp = T dS/dT for state A and state B, in both backends.
+
+    Cp depends on dS_A/dT, which the NumPy core takes by a complex step
+    and the Rust core on dual numbers, both exact to rounding. An earlier
+    version used a central difference with a step of 1e-7 in reduced
+    temperature, which left Cp off by 5e-9 (median) to 3e-8 here. The
+    five-point stencil itself is good to about 1e-10.
+    """
+    batch = _batch('duska2020', backend)
+    T, P = _grid('numpy')
+
+    def S(dT=0.0):
+        with np.errstate(all='ignore'):
+            return np.asarray(batch(T + dT, P, 'stable')['S' + suffix], dtype=float)
+
+    dS_dT = (-S(2 * H_T) + 8 * S(H_T) - 8 * S(-H_T) + S(-2 * H_T)) / (12 * H_T)
+    Cp = np.asarray(batch(T, P, 'stable')['Cp' + suffix], dtype=float)
+    assert np.all(np.isfinite(Cp))
+    rel = np.abs(Cp - T * dS_dT) / np.abs(Cp)
+    i = np.argmax(rel)
+    assert rel.max() < 1e-9, (
+        f'Cp{suffix} / (T dS/dT) - 1 = {rel[i]:.2e} at {T[i]:.2f} K, {P[i]:.1f} MPa')
+
+
 def test_duska_scalar_entry_points_match_batch():
     """compute_properties and compute_properties_at_x use the same G."""
     from duska_eos.core import (compute_batch, compute_properties,

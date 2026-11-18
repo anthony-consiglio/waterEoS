@@ -330,15 +330,14 @@ def test_rust_matches_numpy(model, branch):
     np.testing.assert_array_equal(np.isnan(r['x']), np.isnan(n['x']))
     assert np.isnan(n['x']).any() and np.isfinite(n['x']).any()
     assert n['metastable'].any()
-    # Second-derivative properties are large near a spinodal and, in the
-    # Duska model, partly come from finite differences, so they agree
-    # between the backends less tightly than the first-derivative ones.
+    # Both backends take every derivative exactly (analytically, by a
+    # complex step in NumPy or by dual numbers in Rust), so the
+    # second-derivative properties agree as closely as the others; on this
+    # grid the largest difference is 4e-11.
     for k in n:
         if k == 'metastable':
             continue
-        second = k.split('_')[0] in ('Cp', 'Cv', 'Kt', 'Ks', 'alpha', 'vel')
-        np.testing.assert_allclose(np.asarray(r[k]), n[k],
-                                   rtol=1e-6 if second else 1e-9,
+        np.testing.assert_allclose(np.asarray(r[k]), n[k], rtol=1e-9,
                                    atol=1e-12, equal_nan=True, err_msg=k)
 
 
