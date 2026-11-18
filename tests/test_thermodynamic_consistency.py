@@ -6,8 +6,9 @@ energy must be the potential of the returned entropy and volume,
 
 on every liquid branch and in every backend.
 
-Holten (2014) and Caupin (2019) are written as explicit Gibbs energies, so
-the identities hold by construction; they are checked here as a guard.
+Holten (2014), Caupin (2019) and Bridge29 are written as explicit Gibbs
+energies, so the identities hold by construction; they are checked here as
+a guard.
 Duska (2020) defines state A through its volume and entropy, and its Gibbs
 energy is their closed-form integral (``duska_eos.core.compute_GA``).  An
 earlier version integrated the entropy numerically from the vapor-liquid
@@ -22,15 +23,17 @@ import importlib
 import numpy as np
 import pytest
 
-MODELS = ['holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020']
+MODELS = ['holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'bridge29']
 BRANCHES = ['stable', 'hdl', 'ldl']
 
 _PACKAGE = {'holten2014': 'holten_eos', 'caupin2019': 'caupin_eos',
-            'caupin2019_kim': 'caupin_eos', 'duska2020': 'duska_eos'}
+            'caupin2019_kim': 'caupin_eos', 'duska2020': 'duska_eos',
+            'bridge29': 'watereos.bridge29'}
 _RUST_NAME = {'holten2014': 'compute_batch_holten',
               'caupin2019': 'compute_batch_caupin',
               'caupin2019_kim': 'compute_batch_caupin_kim',
-              'duska2020': 'compute_batch_duska'}
+              'duska2020': 'compute_batch_duska',
+              'bridge29': 'compute_batch_bridge29'}
 
 # Finite-difference steps (five-point stencil) and tolerances.  With these
 # steps the truncation and rounding errors of the stencil are below
@@ -58,7 +61,9 @@ def _batch(model, backend):
         return lambda T, P, branch: core.compute_batch(T, P, branch=branch)
     if backend == 'rust':
         rs = pytest.importorskip('watereos_rs')
-        fn = getattr(rs, _RUST_NAME[model])
+        fn = getattr(rs, _RUST_NAME[model], None)
+        if fn is None:
+            pytest.skip(f'installed watereos_rs has no {_RUST_NAME[model]}')
 
         def rust_batch(T, P, branch):
             try:

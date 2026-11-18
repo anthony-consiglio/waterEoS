@@ -8,6 +8,7 @@ mod par;
 mod caupin;
 mod holten;
 mod duska;
+mod bridge29;
 mod shi_tanaka;
 mod phase;
 mod seafreeze;
@@ -20,6 +21,7 @@ fn watereos_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(caupin::compute_batch_caupin_kim, m)?)?;
     m.add_function(wrap_pyfunction!(holten::compute_batch_holten, m)?)?;
     m.add_function(wrap_pyfunction!(duska::compute_batch_duska, m)?)?;
+    m.add_function(wrap_pyfunction!(bridge29::compute_batch_bridge29, m)?)?;
     m.add_function(wrap_pyfunction!(shi_tanaka::compute_batch_shi_tanaka, m)?)?;
     // Phase diagram (spinodal + binodal)
     m.add_function(wrap_pyfunction!(phase::compute_spinodal_caupin, m)?)?;

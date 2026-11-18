@@ -5,10 +5,16 @@ import pytest
 from watereos import backend, compute, getProp
 from watereos.bridge29.phase import find_LLCP
 
+try:
+    from watereos_rs import compute_batch_bridge29  # noqa: F401
+    EXPECTED_BACKEND = 'rust'
+except ImportError:
+    EXPECTED_BACKEND = 'numpy'
+
 
 def test_grid_and_scatter_match_manuscript():
     grid = compute([150., 250.], [0.1, 100.], 'Bridge29')
-    assert backend('bridge29') == 'numpy'
+    assert backend('bridge29') == EXPECTED_BACKEND
     np.testing.assert_allclose(grid.rho[0], [912.52116856, 991.34620673], rtol=1e-10)
     np.testing.assert_allclose(grid.vel[0], [1959.32356812, 1243.67866267], rtol=1e-10)
     np.testing.assert_allclose(grid.Cp[0], [1364.74218956, 4554.67043861], rtol=1e-10)
