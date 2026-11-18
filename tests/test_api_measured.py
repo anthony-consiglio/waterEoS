@@ -374,3 +374,33 @@ def test_forbidden_terms_stop_the_load(source):
     with pytest.raises(L.LoadError, match='local path'):
         L.build(source, forbid=['secret-lab'])
     assert L.main(['--source', str(source), '--dry-run', '--forbid', 'Secret-Lab']) == 1
+
+
+def test_order_does_not_depend_on_the_database(source, tmp_path, monkeypatch):
+    # PostgreSQL with en_US.utf8 returns rows in a different order from SQLite;
+    # simulate that by reversing whatever the database returns.
+    from watereos_api.measured.store import MeasuredStore
+    db = tmp_path / 'order.sqlite'
+    assert L.main(['--source', str(source), '--db', f'sqlite:///{db}']) == 0
+    real = MeasuredStore.query
+
+    def reversed_query(self, statement, params=()):
+        cols, rows = real(self, statement, params)
+        return cols, list(reversed(rows))
+
+    monkeypatch.setattr(MeasuredStore, 'query', reversed_query)
+    reset_store(f'sqlite:///{db}')
+    try:
+        c = TestClient(create_app())
+        ids = c.get('/api/data/points').json()['columns']['id']
+        assert ids == sorted(ids) and len(ids) == 6
+        keys = [s['source_key'] for s in c.get('/api/data/sources').json()['sources']]
+        assert keys == sorted(keys)
+        z = zipfile.ZipFile(io.BytesIO(c.get('/api/data/download').content))
+        rows = list(csv.DictReader(io.StringIO(z.read('measured_water_data.csv').decode())))
+        order = [(r['group'], r['table'], r['id']) for r in rows]
+        assert order == sorted(order)
+        srcs = [r['source_key'] for r in csv.DictReader(io.StringIO(z.read('sources.csv').decode()))]
+        assert srcs == sorted(srcs)
+    finally:
+        reset_store()

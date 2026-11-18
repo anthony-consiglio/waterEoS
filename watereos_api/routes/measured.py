@@ -58,6 +58,17 @@ def _respond(request: Request, rid: str, key, body: bytes, media_type='applicati
     return Response(content=body, media_type=media_type, headers=h)
 
 
+def _in_order(cols, rows, *keys):
+    """Rows sorted by code point on the given columns, whatever the database's collation.
+
+    SQL ORDER BY follows the database's collation: PostgreSQL with en_US.utf8
+    puts 'melting-Ih' before 'TMiceI', SQLite (and Python) the other way. Sorting
+    here keeps every answer and the download identical on both.
+    """
+    at = [cols.index(k) for k in keys]
+    return sorted(rows, key=lambda r: tuple('' if r[i] is None else r[i] for i in at))
+
+
 def _cached(st, key, producer):
     try:
         return st.cached(key, producer)
@@ -91,7 +102,7 @@ def _release_payload(st):
     order = {g: i for i, g in enumerate(S.GROUP_KEYS)}
     tl = sorted(tables.values(), key=lambda t: (order.get(t['group'], 99), t['label']))
     for t in tl:
-        t['properties'].sort(key=lambda p: -p['n'])
+        t['properties'].sort(key=lambda p: (-p['n'], p['key']))
     rid = rel['release_id']
     return dumps({
         'configured': True,
@@ -130,7 +141,8 @@ def _points_payload(st, table, prop):
         where.append('property = ?')
         params.append(prop)
     clause = f' WHERE {" AND ".join(where)}' if where else ''
-    cols, rows = st.query(f'SELECT {", ".join(POINT_COLUMNS)} FROM {S.TABLE_ROWS}{clause} ORDER BY id', params)
+    cols, rows = st.query(f'SELECT {", ".join(POINT_COLUMNS)} FROM {S.TABLE_ROWS}{clause}', params)
+    rows = _in_order(cols, rows, 'id')
     columns = {c: [r[i] for r in rows] for i, c in enumerate(cols)}
     columns['table'] = columns.pop('tbl')
     columns['group'] = columns.pop('grp')
@@ -163,8 +175,8 @@ def row(row_id: str):
 
 
 def _sources_payload(st):
-    cols, rows = st.query(f'SELECT {", ".join(c for c, _ in S.SOURCE_TABLE_COLUMNS)} FROM {S.TABLE_SOURCES} '
-                          f'ORDER BY source_key')
+    cols, rows = st.query(f'SELECT {", ".join(c for c, _ in S.SOURCE_TABLE_COLUMNS)} FROM {S.TABLE_SOURCES}')
+    rows = _in_order(cols, rows, 'source_key')
     return dumps({'release_id': st.release()['release_id'], 'sources': [dict(zip(cols, r)) for r in rows]})
 
 
@@ -213,15 +225,16 @@ sources.csv              the studies, with citation, DOI and row counts.
 
 def _download_payload(st):
     rel = st.release()
-    cols, rows = st.query(f'SELECT {", ".join(S.ROW_COLUMNS)} FROM {S.TABLE_ROWS} ORDER BY grp, tbl, id')
+    cols, rows = st.query(f'SELECT {", ".join(S.ROW_COLUMNS)} FROM {S.TABLE_ROWS}')
+    rows = _in_order(cols, rows, 'grp', 'tbl', 'id')
     header = ['table' if c == 'tbl' else 'group' if c == 'grp' else c for c in cols]
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator='\n')
     w.writerow(header)
     for r in rows:
         w.writerow(['' if v is None else repr(v) if isinstance(v, float) else v for v in r])
-    scols, srows = st.query(f'SELECT {", ".join(c for c, _ in S.SOURCE_TABLE_COLUMNS)} FROM {S.TABLE_SOURCES} '
-                            f'ORDER BY source_key')
+    scols, srows = st.query(f'SELECT {", ".join(c for c, _ in S.SOURCE_TABLE_COLUMNS)} FROM {S.TABLE_SOURCES}')
+    srows = _in_order(scols, srows, 'source_key')
     sbuf = io.StringIO()
     sw = csv.writer(sbuf, lineterminator='\n')
     sw.writerow(scols)
