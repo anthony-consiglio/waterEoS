@@ -45,7 +45,8 @@ def main():
         print(f'Computing {model_key}...', end=' ', flush=True)
         t0 = time.time()
         try:
-            data = compute_phase_diagram_data(model_key)
+            # Compute afresh rather than reading back the JSON being replaced.
+            data = compute_phase_diagram_data(model_key, use_precomputed=False)
             serialized = _serialize(data)
 
             out_path = DATA_DIR / f'{model_key}_phase_diagram.json'

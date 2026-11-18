@@ -26,6 +26,8 @@ on a temperature-pressure grid and refined by bisection.
 Public functions
 ----------------
 compute_eos_phase_diagram(model_key)   curves as numpy arrays
+liquid_liquid_lines(model_key)         coexistence line and stability limits only
+liquid_fraction(model_key, T, p, ...)  fraction x of one liquid, also on its stability limit
 reference_points()                     the measured points
 plot_eos_phase_diagram(model_key)      Plotly figure in the visualizer's style (needs plotly)
 eos_phase_diagram_to_json(data)        JSON-ready copy of a result
@@ -289,6 +291,115 @@ def _liquid_liquid_lines(model, tc, pc, T, P):
     return out
 
 
+def _grid(model):
+    """Temperature and pressure axes of the tracing grid."""
+    T = np.arange(T_RANGE[0], T_RANGE[1] + _DT / 2, _DT)
+    P = np.arange(model['p_min'], P_RANGE[1] + _DP / 2, _DP)
+    return T, P
+
+
+def liquid_liquid_lines(model_key):
+    """Liquid-liquid critical point, coexistence line and stability limits of a two-state model.
+
+    The lines are traced as contours on the diagram's temperature-pressure
+    grid (100 K up, 400 MPa at most) and refined by bisection, so they follow
+    the reentrant branches some models have below about 150 K, where the
+    per-pressure solvers return one temperature per pressure and can jump to
+    a spurious root.
+
+    Parameters
+    ----------
+    model_key : str
+        One of ``MODELS``.
+
+    Returns
+    -------
+    dict
+        ``llcp``: {'T_K', 'p_MPa'};
+        ``binodal``: (n, 2) array of (T, p), starting at the critical point;
+        ``hdl_limit``: list of (n, 2) arrays, the stability limit of the
+        high-density liquid, below which (on cooling) it no longer exists;
+        ``ldl_limit``: list of (n, 2) arrays, the stability limit of the
+        low-density liquid, above which (on heating) it no longer exists.
+        The piece of each limit that joins the critical point starts there.
+        Temperatures in K, pressures in MPa. The result is cached; treat it
+        as read-only.
+    """
+    key = ('liquid_liquid', model_key)
+    if key not in _cache:
+        model = _model(model_key)
+        llcp = model['find_llcp']()
+        tc, pc = float(llcp['T_K']), float(llcp['p_MPa'])
+        T, P = _grid(model)
+        _cache[key] = {'llcp': {'T_K': tc, 'p_MPa': pc}, **_liquid_liquid_lines(model, tc, pc, T, P)}
+    return _cache[key]
+
+
+#: Steps (K or MPa) that liquid_fraction tries, smallest first, around a point
+#: just outside the region where the requested liquid exists.
+_FRACTION_STEPS = (1e-6, 1e-4, 1e-2)
+
+
+def liquid_fraction(model_key, T_K, p_MPa, branch, inset=0.0):
+    """Fraction x that the model gives to its 'hdl' or 'ldl' liquid at each point.
+
+    Parameters
+    ----------
+    model_key : str
+        One of ``MODELS``.
+    T_K, p_MPa : array_like
+        Points, in K and MPa.
+    branch : {'hdl', 'ldl'}
+        Liquid whose fraction is wanted (the ``branch`` of the model's
+        ``compute_batch``).
+    inset : float
+        For points on that liquid's own stability limit (``hdl_limit`` for
+        'hdl', ``ldl_limit`` for 'ldl'). The response functions of a liquid
+        (heat capacity, compressibility, expansivity) diverge on its
+        stability limit, so properties evaluated with x from the limit
+        itself are arbitrarily large. With ``inset`` > 0, x is taken
+        ``inset`` K or MPa inside the region where the liquid exists: at
+        whichever of the four points ``inset`` away along T or p has the
+        liquid and gives the x farthest from its value at the limit. The
+        per-pressure solvers took x 1e-3 K inside the limit for the same
+        reason.
+
+    Returns
+    -------
+    numpy.ndarray
+        x at each point, NaN where the liquid does not exist. A point traced
+        on the liquid's limit lies within about 1e-9 K or MPa of it and may
+        fall just outside; there x is taken at the first of a few points
+        1e-6 to 1e-2 K or MPa away along T or p that has the liquid.
+    """
+    if branch not in ('hdl', 'ldl'):
+        raise ValueError(f"branch must be 'hdl' or 'ldl', not {branch!r}")
+    batch = _model(model_key)['batch']
+    T = np.atleast_1d(np.asarray(T_K, float)).ravel()
+    p = np.atleast_1d(np.asarray(p_MPa, float)).ravel()
+    directions = ((-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0))
+
+    x = np.asarray(_evaluate(batch, T, p, branch)['x'], float).copy()
+    for step in _FRACTION_STEPS:
+        for dT, dp in directions:
+            missing = ~np.isfinite(x) & np.isfinite(T) & np.isfinite(p)
+            if not missing.any():
+                break
+            x[missing] = _evaluate(batch, T[missing] + step * dT, p[missing] + step * dp, branch)['x']
+    if not inset:
+        return x
+
+    inside = np.full(x.shape, np.nan)
+    depth = np.full(x.shape, -1.0)
+    for dT, dp in directions:
+        candidate = np.asarray(_evaluate(batch, T + inset * dT, p + inset * dp, branch)['x'], float)
+        distance = np.where(np.isfinite(x), np.abs(candidate - x), 0.0)
+        deeper = np.isfinite(candidate) & (distance > depth)
+        inside = np.where(deeper, candidate, inside)
+        depth = np.where(deeper, distance, depth)
+    return inside
+
+
 # ---------------------------------------------------------------------------
 # Ices, nucleation, vapor
 # ---------------------------------------------------------------------------
@@ -397,11 +508,10 @@ def compute_eos_phase_diagram(model_key):
         return _cache[model_key]
     model = _model(model_key)
     batch = model['batch']
-    llcp = model['find_llcp']()
-    tc, pc = float(llcp['T_K']), float(llcp['p_MPa'])
+    liquid_liquid = liquid_liquid_lines(model_key)
+    tc, pc = liquid_liquid['llcp']['T_K'], liquid_liquid['llcp']['p_MPa']
 
-    T = np.arange(T_RANGE[0], T_RANGE[1] + _DT / 2, _DT)
-    P = np.arange(model['p_min'], P_RANGE[1] + _DP / 2, _DP)
+    T, P = _grid(model)
     tt, pp = np.meshgrid(T, P)
     valid = np.ones(tt.shape, bool)
     lv_spinodal = None
@@ -431,7 +541,6 @@ def compute_eos_phase_diagram(model_key):
     extrema = {key: _extrema_curves(T, P, np.where(continuous, props[prop], np.nan), axis)
                for key, prop, axis in EXTREMA}
     widom = _contour_zero(T, P, np.where(continuous & (tt >= tc), x - 0.5, np.nan))
-    liquid_liquid = _liquid_liquid_lines(model, tc, pc, T, P)
 
     from vapor_eos.vapor_eos import vapor_pressure
     t_vl = np.arange(T_RANGE[0], T_RANGE[1] + 0.5, 1.0)

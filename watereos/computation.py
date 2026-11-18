@@ -207,19 +207,43 @@ def compute_phase_diagram_data(model_key, n_pressures=150,
                                tmd_n_T_scan=None, tmd_T_lo=None,
                                tmd_bisection_iters=None,
                                widom_slope=None, widom_window=None,
-                               widom_n_T_scan=None):
+                               widom_n_T_scan=None, *, use_precomputed=True):
     """
     Compute full phase diagram for a two-state model.
 
-    Checks for precomputed JSON first, then module-level cache, then
-    falls back to live computation.
+    Checks the module-level cache first, then (for the default parameters)
+    the precomputed JSON in ``watereos/data``, then falls back to live
+    computation. ``use_precomputed=False`` skips both and computes afresh;
+    ``scripts/precompute_phase_diagrams.py`` uses it to regenerate the JSON.
+
+    The liquid-liquid lines come from
+    ``watereos.eos_phase_diagram.liquid_liquid_lines``, which traces them as
+    contours, so they follow the reentrant branches some models have at low
+    temperature. They reach down to 100 K and up to ``P_max``.
+    ``n_pressures`` and ``P_llcp_offset`` set the pressure grid of the
+    per-pressure solvers these lines used to come from; they are accepted
+    for compatibility and no longer change the result.
 
     Returns
     -------
-    dict with keys: 'LLCP', 'spinodal', 'binodal' (model-dependent),
-    'tmd', 'widom' (model-dependent), 'ice_ih_liquidus', 'ice_iii_liquidus',
-    'nucleation_ih', 'nucleation_iii', 'kauzmann_hdl', 'kauzmann_ldl',
-    'triple_point' (model-independent).
+    dict with keys:
+        'LLCP': the liquid-liquid critical point;
+        'binodal': {'T_K', 'p_MPa', 'x_hdl', 'x_ldl'}, the coexistence line
+        from the critical point, with the fractions x of the two coexisting
+        liquids;
+        'hdl_spinodal': {'T_K', 'p_MPa', 'x'}, the stability limit of the
+        high-density liquid (it ceases to exist below this temperature),
+        with x of that liquid 1e-3 K or MPa inside its limit, where its
+        response functions are still finite;
+        'ldl_spinodal': {'T_K', 'p_MPa', 'x'}, the stability limit of the
+        low-density liquid (it ceases to exist above this temperature),
+        with x of that liquid taken the same way;
+        'tmd', 'widom', 'kauzmann' (model-dependent); 'ice_ih_liquidus',
+        'ice_iii_liquidus', 'nucleation_ih', 'nucleation_iii',
+        'triple_point' (model-independent).
+    A line in several pieces has a row of NaN between the pieces; each piece
+    of the two stability limits that joins the critical point starts there,
+    as does the coexistence line.
     """
     # Apply defaults for any unspecified parameters
     d = _PHASE_DIAGRAM_DEFAULTS
@@ -251,52 +275,31 @@ def compute_phase_diagram_data(model_key, n_pressures=150,
     using_defaults = (params == default_params)
 
     # Check caches: precomputed JSON is only valid for default parameters
-    if cache_key in _phase_diagram_cache:
+    if use_precomputed and cache_key in _phase_diagram_cache:
         return _phase_diagram_cache[cache_key]
 
-    if using_defaults:
+    if use_precomputed and using_defaults:
         precomputed = _load_precomputed(model_key)
         if precomputed is not None:
             _phase_diagram_cache[cache_key] = precomputed
             return precomputed
 
     if model_key == 'duska2020':
-        from duska_eos.phase_diagram import find_LLCP, compute_spinodal_curve, compute_binodal_curve
+        from duska_eos.phase_diagram import find_LLCP
     elif model_key == 'holten2014':
-        from holten_eos.phase_diagram import find_LLCP, compute_spinodal_curve, compute_binodal_curve
+        from holten_eos.phase_diagram import find_LLCP
     elif model_key == 'caupin2019':
-        from caupin_eos.phase_diagram import find_LLCP, compute_spinodal_curve, compute_binodal_curve
+        from caupin_eos.phase_diagram import find_LLCP
     elif model_key == 'caupin2019_kim':
         import functools
         from caupin_eos import params_kim as _pk
         from caupin_eos import phase_diagram as _cpd
         find_LLCP = functools.partial(_cpd.find_LLCP, _pk)
-        compute_spinodal_curve = functools.partial(_cpd.compute_spinodal_curve, pset=_pk)
-        compute_binodal_curve = functools.partial(_cpd.compute_binodal_curve, pset=_pk)
     else:
         raise ValueError(f'No phase diagram for model {model_key}')
 
     llcp = find_LLCP()
-    P_llcp = float(llcp['p_MPa'])
-
-    # Dense spacing near LLCP for smooth curve onset, sparser far away
-    n_near = n_pressures // 3
-    n_far = n_pressures - n_near
-    p_near = np.linspace(P_llcp + P_llcp_offset, P_llcp + 10.0, n_near, endpoint=False)
-    p_far = np.linspace(P_llcp + 10.0, P_max, n_far)
-    p_arr = np.concatenate([p_near, p_far])
-    spinodal = compute_spinodal_curve(p_range_MPa=p_arr)
-    binodal = compute_binodal_curve(p_range_MPa=p_arr, spinodal=spinodal)
-
-    # Split spinodal into HDL (upper) and LDL (lower) branches
-    hdl_spinodal = None
-    ldl_spinodal = None
-    if 'T_upper' in spinodal and len(spinodal['T_upper']) > 0:
-        hdl_spinodal = {'T_K': spinodal['T_upper'],
-                        'p_MPa': spinodal['p_array']}
-    if 'T_lower' in spinodal and len(spinodal['T_lower']) > 0:
-        ldl_spinodal = {'T_K': spinodal['T_lower'],
-                        'p_MPa': spinodal['p_array']}
+    liquid_liquid = _liquid_liquid_curves(model_key, llcp, P_max)
 
     tmd = _compute_tmd_curve(model_key, llcp=llcp,
                              n_T_scan=tmd_n_T_scan, T_lo=tmd_T_lo,
@@ -314,10 +317,7 @@ def compute_phase_diagram_data(model_key, n_pressures=150,
 
     result = {
         'LLCP': llcp,
-        'spinodal': spinodal,
-        'hdl_spinodal': hdl_spinodal,
-        'ldl_spinodal': ldl_spinodal,
-        'binodal': binodal,
+        **liquid_liquid,
         'tmd': tmd,
         'widom': widom,
         'ice_ih_liquidus': _ice_ih_liquidus(),
@@ -353,6 +353,58 @@ def _get_compute_batch(model_key):
     else:
         raise ValueError(f'No compute_batch for model {model_key}')
     return compute_batch
+
+
+def _pieces_up_to(path, P_max):
+    """Runs of consecutive points of an (n, 2) path of (T, p) with p <= P_max."""
+    inside = np.asarray(path)[:, 1] <= P_max
+    edges = np.flatnonzero(np.diff(np.r_[0, inside.astype(np.int8), 0]))
+    return [path[a:b] for a, b in zip(edges[::2], edges[1::2]) if b - a > 1]
+
+
+#: Distance (K or MPa) inside a liquid's stability limit at which its fraction
+#: x is taken; its response functions diverge on the limit itself. The
+#: per-pressure solvers used 1e-3 K.
+_SPINODAL_X_INSET = 1e-3
+
+
+def _liquid_liquid_curves(model_key, llcp, P_max):
+    """Coexistence line and stability limits of the two liquids, up to P_max.
+
+    Traced as contours by watereos.eos_phase_diagram.liquid_liquid_lines.
+    Returns {'binodal', 'hdl_spinodal', 'ldl_spinodal'}, each a dict of
+    arrays ('T_K', 'p_MPa' and the fractions x of the liquids involved) or
+    None; a row of NaN separates the pieces of a line. At the critical
+    point every fraction is the critical one, llcp['x'].
+    """
+    from watereos.eos_phase_diagram import liquid_fraction, liquid_liquid_lines
+
+    lines = liquid_liquid_lines(model_key)
+    tc, pc, xc = float(llcp['T_K']), float(llcp['p_MPa']), llcp.get('x', np.nan)
+
+    def assemble(paths, fractions, inset=0.0):
+        pieces = [piece for path in paths for piece in _pieces_up_to(path, P_max)]
+        if not pieces:
+            return None
+        blocks = []
+        for i, piece in enumerate(pieces):
+            if i:
+                blocks.append(np.full((1, 2 + len(fractions)), np.nan))
+            T, p = piece[:, 0], piece[:, 1]
+            x = [liquid_fraction(model_key, T, p, branch, inset=inset) for branch in fractions.values()]
+            critical = (np.abs(T - tc) < 1e-9) & (np.abs(p - pc) < 1e-9)
+            blocks.append(np.column_stack([T, p] + [np.where(critical, xc, xi) for xi in x]))
+        table = np.vstack(blocks)
+        out = {'T_K': table[:, 0], 'p_MPa': table[:, 1]}
+        for j, name in enumerate(fractions):
+            out[name] = table[:, 2 + j]
+        return out
+
+    return {
+        'binodal': assemble([lines['binodal']], {'x_hdl': 'hdl', 'x_ldl': 'ldl'}),
+        'hdl_spinodal': assemble(lines['hdl_limit'], {'x': 'hdl'}, _SPINODAL_X_INSET),
+        'ldl_spinodal': assemble(lines['ldl_limit'], {'x': 'ldl'}, _SPINODAL_X_INSET),
+    }
 
 
 def _compute_tmd_curve(model_key, llcp=None, n_points=80,

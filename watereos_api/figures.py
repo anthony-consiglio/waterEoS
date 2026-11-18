@@ -14,7 +14,7 @@ from watereos.computation import (
     compute_property_surface,
 )
 from watereos.model_registry import MODEL_REGISTRY
-from watereos.eos_phase_diagram import plot_eos_phase_diagram
+from watereos.eos_phase_diagram import LAYERS as EOS_PHASE_LAYERS, plot_eos_phase_diagram
 from watereos.tv_phase_diagram import (
     compute_tv_phase_diagram,
     plot_tv_phase_diagram_plotly,
@@ -63,35 +63,129 @@ def _compute_along_curve(model_key, prop_key, T_arr, P_arr):
     return np.diag(Z)
 
 
-def _extend_to_llcp(T_arr, P_arr, prop_arr, pd_data, model_key, prop_key):
-    """Prepend the LLCP point so phase boundary curves converge at the critical point.
+# ---------------------------------------------------------------------------
+# Liquid-liquid phase overlays
+# ---------------------------------------------------------------------------
 
-    Ported verbatim from watereos_visualizer/callbacks/property_explorer.py.
+#: Liquid-liquid lines of compute_phase_diagram_data drawn by the overlays:
+#: (data key, overlay kind, fraction keys of the liquids whose property is
+#: drawn in property space). Trace names are those of the EoS Phase Diagram
+#: tab (EOS_PHASE_LAYERS).
+_PHASE_LINES = (
+    ("ldl_spinodal", "spinodal", ("x",)),
+    ("hdl_spinodal", "spinodal", ("x",)),
+    ("binodal", "binodal", ("x_hdl", "x_ldl")),
+)
+
+
+def _phase_line_style(kind, width=1.5):
+    if kind == "spinodal":
+        return dict(color=PHASE_SPINODAL_COLOR, width=width, dash="dash")
+    return dict(color=PHASE_BINODAL_COLOR, width=width)
+
+
+def _runs(mask, min_len=2):
+    """Slices of the runs of at least min_len consecutive True values of a boolean array."""
+    edges = np.flatnonzero(np.diff(np.r_[0, np.asarray(mask, dtype=np.int8), 0]))
+    return [slice(a, b) for a, b in zip(edges[::2], edges[1::2]) if b - a >= min_len]
+
+
+def _phase_line_pieces(pd, key, fraction_keys):
+    """Pieces of one liquid-liquid line, split at its NaN rows: [(T, P, [x, ...]), ...]."""
+    curve = pd.get(key)
+    if not curve:
+        return []
+    T = np.asarray(curve.get("T_K", []), dtype=float)
+    P = np.asarray(curve.get("p_MPa", []), dtype=float)
+    if T.size == 0 or T.shape != P.shape:
+        return []
+    fractions = []
+    for fraction_key in fraction_keys:
+        x = np.asarray(curve.get(fraction_key, []), dtype=float)
+        fractions.append(x if x.shape == T.shape else None)
+    return [(T[s], P[s], [None if x is None else x[s] for x in fractions])
+            for s in _runs(np.isfinite(T) & np.isfinite(P), min_len=1)]
+
+
+def _phase_line_property(model_key, prop_key, T, P, x, llcp):
+    """Property along part of a liquid-liquid line.
+
+    Evaluated for the liquid whose fraction is x where the model supports it
+    (compute_property_at_forced_x), otherwise for the stable liquid. Points at
+    the critical point llcp = (T_c, P_c) take the stable liquid's value there.
+    Returns an array, NaN where the evaluation failed, or None.
     """
-    if 'LLCP' not in pd_data:
-        return T_arr, P_arr, prop_arr
-    llcp = pd_data['LLCP']
-    T_c, P_c = float(llcp['T_K']), float(llcp['p_MPa'])
-    prop_c = _compute_along_curve(model_key, prop_key, np.array([T_c]), np.array([P_c]))
-    if not np.isfinite(prop_c[0]):
-        return T_arr, P_arr, prop_arr
-    return (np.concatenate([[T_c], T_arr]),
-            np.concatenate([[P_c], P_arr]),
-            np.concatenate([prop_c, prop_arr]))
+    vals = None
+    if x is not None and not prop_key.endswith(("_A", "_B")):
+        vals = compute_property_at_forced_x(model_key, prop_key, T, P, x)
+    if vals is None or np.all(np.isnan(vals)):
+        try:
+            vals = _compute_along_curve(model_key, prop_key, T, P)
+        except Exception:
+            logger.debug("phase line property evaluation failed", exc_info=True)
+            return None
+    vals = np.array(vals, dtype=float)
+    if llcp is not None:
+        at_llcp = (np.abs(T - llcp[0]) < 1e-9) & (np.abs(P - llcp[1]) < 1e-9)
+        if at_llcp.any():
+            try:
+                vals[at_llcp] = _compute_along_curve(
+                    model_key, prop_key, np.array([llcp[0]]), np.array([llcp[1]]))[0]
+            except Exception:
+                logger.debug("LLCP property eval failed", exc_info=True)
+    return vals
+
+
+def _phase_line_runs(pd, model_key, T_range, P_range, prop_key=None):
+    """Runs of the liquid-liquid lines inside the T-P window, one per contiguous stretch.
+
+    The lines of compute_phase_diagram_data are traced as contours and can be
+    reentrant: a line may leave the window and come back. Each stretch inside
+    the window (and, with prop_key, with a finite property value) is its own
+    run, so no segment is drawn across a gap.
+
+    Returns a list of dicts with keys key (data key), kind ('spinodal' or
+    'binodal'), T, P and prop (None without prop_key). In property space the
+    coexistence line gives one run per coexisting liquid.
+    """
+    llcp_dict = pd.get("LLCP")
+    llcp = None if llcp_dict is None else (float(llcp_dict["T_K"]), float(llcp_dict["p_MPa"]))
+    runs = []
+    for key, kind, fraction_keys in _PHASE_LINES:
+        if prop_key is not None and kind == "binodal" and prop_key.endswith(("_A", "_B")):
+            continue
+        for T, P, fractions in _phase_line_pieces(pd, key, fraction_keys):
+            inside = _clip_phase_tp(T, P, T_range, P_range)
+            if not inside.any():
+                continue
+            if prop_key is None:
+                runs += [dict(key=key, kind=kind, T=T[s], P=P[s], prop=None)
+                         for s in _runs(inside)]
+                continue
+            for x in fractions:
+                vals = _phase_line_property(
+                    model_key, prop_key, T[inside], P[inside],
+                    None if x is None else x[inside], llcp)
+                if vals is None:
+                    continue
+                prop = np.full(T.shape, np.nan)
+                prop[inside] = vals
+                runs += [dict(key=key, kind=kind, T=T[s], P=P[s], prop=prop[s])
+                         for s in _runs(inside & np.isfinite(prop))]
+    return runs
 
 
 def _add_phase_traces(fig, pd, model_key, prop_key, isobar_mode,
                       T_range, P_range, units):
-    """Add spinodal, binodal, and LLCP traces evaluated in property space.
+    """Add the liquid-liquid lines and the LLCP, evaluated in property space.
 
-    Mirrors watereos_visualizer/callbacks/property_explorer.py::_compute_phase_curves
-    semantics: evaluates the property along each phase boundary curve, extends each
-    branch to the LLCP via _extend_to_llcp, and plots on the same axes as the
-    isobar/isotherm property curves.
+    Each stability limit is drawn with the property of the liquid that ceases
+    to exist there, and the coexistence line with that of each coexisting
+    liquid, on the same axes as the isobar/isotherm property curves.
 
-    Spinodal: PHASE_SPINODAL_COLOR dashed
-    Binodal:  PHASE_BINODAL_COLOR solid
-    LLCP:     PHASE_LLCP_COLOR marker
+    Stability limits: PHASE_SPINODAL_COLOR dashed
+    Coexistence:      PHASE_BINODAL_COLOR solid
+    LLCP:             PHASE_LLCP_COLOR marker
     """
     info = MODEL_REGISTRY[model_key]
     T_lo = T_range[0] if T_range else info.T_min - 10
@@ -99,104 +193,19 @@ def _add_phase_traces(fig, pd, model_key, prop_key, isobar_mode,
     P_lo = P_range[0] if P_range else -200.0
     P_hi = P_range[1] if P_range else 400.0
 
-    spinodal = pd.get("spinodal")
-    if spinodal is not None:
-        p_arr = np.asarray(spinodal["p_array"])
-        first_spinodal = True
-        for branch_key, x_key in [
-            ("T_upper", "x_hi_upper"),
-            ("T_lower", "x_lo_lower"),
-        ]:
-            T_branch = np.asarray(spinodal.get(branch_key, []))
-            if T_branch.size == 0:
-                continue
-            valid = (
-                np.isfinite(T_branch)
-                & (T_branch >= T_lo) & (T_branch <= T_hi)
-                & (p_arr >= P_lo) & (p_arr <= P_hi)
-            )
-            if not np.any(valid):
-                continue
-            T_b, P_b = T_branch[valid], p_arr[valid]
-
-            x_sp = np.asarray(spinodal.get(x_key, []))
-            prop_vals = None
-            if x_sp.size == p_arr.size and not prop_key.endswith(("_A", "_B")):
-                prop_vals = compute_property_at_forced_x(
-                    model_key, prop_key, T_b, P_b, x_sp[valid])
-            if prop_vals is None or np.all(np.isnan(prop_vals)):
-                try:
-                    prop_vals = _compute_along_curve(model_key, prop_key, T_b, P_b)
-                except Exception:
-                    logger.debug("spinodal property eval failed", exc_info=True)
-                    continue
-
-            Te, Pe, prop_ext = _extend_to_llcp(T_b, P_b, prop_vals, pd, model_key, prop_key)
-
-            x_vals = Te if isobar_mode else Pe
-            y_vals = convert_array(prop_key, list(prop_ext), units)
-            mask = np.isfinite(prop_ext)
-            x_plot = x_vals[mask].tolist()
-            y_plot = [y_vals[i] for i, m in enumerate(mask) if m]
-
-            if not x_plot:
-                continue
-
-            fig.add_trace(go.Scatter(
-                x=x_plot, y=y_plot,
-                mode="lines",
-                name="Spinodal" if first_spinodal else None,
-                showlegend=first_spinodal,
-                line=dict(color=PHASE_SPINODAL_COLOR, width=1.5, dash="dash"),
-            ))
-            first_spinodal = False
-
-    binodal = pd.get("binodal")
-    if binodal is not None:
-        p_arr = np.asarray(binodal["p_array"])
-        T_bn = np.asarray(binodal.get("T_binodal", []))
-        if T_bn.size > 0 and not prop_key.endswith(("_A", "_B")):
-            valid = (
-                np.isfinite(T_bn)
-                & (T_bn >= T_lo) & (T_bn <= T_hi)
-                & (p_arr >= P_lo) & (p_arr <= P_hi)
-            )
-            if np.any(valid):
-                T_b, P_b = T_bn[valid], p_arr[valid]
-                x_lo_arr = np.asarray(binodal.get("x_lo", []))
-                x_hi_arr = np.asarray(binodal.get("x_hi", []))
-                for x_arr, lbl in [(x_lo_arr, "Binodal"), (x_hi_arr, None)]:
-                    prop_vals = None
-                    if x_arr.size == p_arr.size:
-                        prop_vals = compute_property_at_forced_x(
-                            model_key, prop_key, T_b, P_b, x_arr[valid])
-                    if prop_vals is None or np.all(np.isnan(prop_vals)):
-                        try:
-                            prop_vals = _compute_along_curve(
-                                model_key, prop_key, T_b, P_b)
-                        except Exception:
-                            logger.debug("binodal property eval failed", exc_info=True)
-                            continue
-
-                    Te, Pe, prop_ext = _extend_to_llcp(
-                        T_b, P_b, prop_vals, pd, model_key, prop_key)
-
-                    x_vals = Te if isobar_mode else Pe
-                    y_vals = convert_array(prop_key, list(prop_ext), units)
-                    mask = np.isfinite(prop_ext)
-                    x_plot = x_vals[mask].tolist()
-                    y_plot = [y_vals[i] for i, m in enumerate(mask) if m]
-
-                    if not x_plot:
-                        continue
-
-                    fig.add_trace(go.Scatter(
-                        x=x_plot, y=y_plot,
-                        mode="lines",
-                        name=lbl,
-                        showlegend=lbl is not None,
-                        line=dict(color=PHASE_BINODAL_COLOR, width=1.5),
-                    ))
+    shown = set()
+    for run in _phase_line_runs(pd, model_key, (T_lo, T_hi), (P_lo, P_hi), prop_key):
+        key = run["key"]
+        x_vals = run["T"] if isobar_mode else run["P"]
+        fig.add_trace(go.Scatter(
+            x=x_vals.tolist(),
+            y=convert_array(prop_key, run["prop"].tolist(), units),
+            mode="lines",
+            name=EOS_PHASE_LAYERS[key], legendgroup=key,
+            showlegend=key not in shown,
+            line=_phase_line_style(run["kind"]),
+        ))
+        shown.add(key)
 
     llcp = pd.get("LLCP")
     if llcp is not None:
@@ -245,10 +254,12 @@ def _clip_phase_tp(T_arr, P_arr, T_range, P_range):
 def _phase_segments_3d(model_key, prop_key, T_range, P_range):
     """Compute spinodal/binodal/LLCP curves in (T, P, property) space.
 
-    Returns a list of dicts with keys {T, P, prop, type, name, show_legend}.
-    Mirrors watereos_visualizer/callbacks/property_explorer.py::_compute_phase_3d.
-    Each segment is clipped to the user's bounding box; segments whose
-    property evaluation fails entirely are dropped.
+    Returns a list of dicts with keys {T, P, prop, type, group, name,
+    show_legend}. Mirrors
+    watereos_visualizer/callbacks/property_explorer.py::_compute_phase_3d.
+    Each segment is one contiguous stretch of a line inside the user's
+    bounding box (see _phase_line_runs); stretches whose property
+    evaluation fails entirely are dropped.
     """
     try:
         pd = compute_phase_diagram_data(model_key)
@@ -260,84 +271,19 @@ def _phase_segments_3d(model_key, prop_key, T_range, P_range):
     P_lo, P_hi = float(P_range[0]), float(P_range[1])
     segments = []
 
-    spinodal = pd.get("spinodal")
-    if spinodal is not None:
-        p_arr = np.asarray(spinodal["p_array"])
-        first = True
-        for branch_key, x_key in [("T_upper", "x_hi_upper"),
-                                  ("T_lower", "x_lo_lower")]:
-            T_branch = np.asarray(spinodal.get(branch_key, []))
-            if T_branch.size == 0:
-                continue
-            valid = (np.isfinite(T_branch)
-                     & (T_branch >= T_lo) & (T_branch <= T_hi)
-                     & (p_arr >= P_lo) & (p_arr <= P_hi))
-            if not np.any(valid):
-                continue
-            T_b, P_b = T_branch[valid], p_arr[valid]
-            x_sp = np.asarray(spinodal.get(x_key, []))
-            prop_vals = None
-            if x_sp.size == p_arr.size and not prop_key.endswith(("_A", "_B")):
-                prop_vals = compute_property_at_forced_x(
-                    model_key, prop_key, T_b, P_b, x_sp[valid])
-            if prop_vals is None or np.all(np.isnan(prop_vals)):
-                try:
-                    prop_vals = _compute_along_curve(model_key, prop_key, T_b, P_b)
-                except Exception:
-                    logger.debug("spinodal 3D eval failed", exc_info=True)
-                    continue
-            Te, Pe, prop_ext = _extend_to_llcp(
-                T_b, P_b, prop_vals, pd, model_key, prop_key)
-            mask = np.isfinite(prop_ext)
-            if not mask.any():
-                continue
-            segments.append({
-                "T": Te[mask].tolist(),
-                "P": Pe[mask].tolist(),
-                "prop": prop_ext[mask].tolist(),
-                "type": "spinodal",
-                "name": "Spinodal" if first else None,
-                "show_legend": first,
-            })
-            first = False
-
-    binodal = pd.get("binodal")
-    if binodal is not None:
-        p_arr = np.asarray(binodal["p_array"])
-        T_bn = np.asarray(binodal.get("T_binodal", []))
-        if T_bn.size > 0 and not prop_key.endswith(("_A", "_B")):
-            valid = (np.isfinite(T_bn)
-                     & (T_bn >= T_lo) & (T_bn <= T_hi)
-                     & (p_arr >= P_lo) & (p_arr <= P_hi))
-            if np.any(valid):
-                T_b, P_b = T_bn[valid], p_arr[valid]
-                x_lo_arr = np.asarray(binodal.get("x_lo", []))
-                x_hi_arr = np.asarray(binodal.get("x_hi", []))
-                for x_arr, lbl in [(x_lo_arr, "Binodal"), (x_hi_arr, None)]:
-                    prop_vals = None
-                    if x_arr.size == p_arr.size:
-                        prop_vals = compute_property_at_forced_x(
-                            model_key, prop_key, T_b, P_b, x_arr[valid])
-                    if prop_vals is None or np.all(np.isnan(prop_vals)):
-                        try:
-                            prop_vals = _compute_along_curve(
-                                model_key, prop_key, T_b, P_b)
-                        except Exception:
-                            logger.debug("binodal 3D eval failed", exc_info=True)
-                            continue
-                    Te, Pe, prop_ext = _extend_to_llcp(
-                        T_b, P_b, prop_vals, pd, model_key, prop_key)
-                    mask = np.isfinite(prop_ext)
-                    if not mask.any():
-                        continue
-                    segments.append({
-                        "T": Te[mask].tolist(),
-                        "P": Pe[mask].tolist(),
-                        "prop": prop_ext[mask].tolist(),
-                        "type": "binodal",
-                        "name": lbl,
-                        "show_legend": lbl is not None,
-                    })
+    shown = set()
+    for run in _phase_line_runs(pd, model_key, (T_lo, T_hi), (P_lo, P_hi), prop_key):
+        key = run["key"]
+        segments.append({
+            "T": run["T"].tolist(),
+            "P": run["P"].tolist(),
+            "prop": run["prop"].tolist(),
+            "type": run["kind"],
+            "group": key,
+            "name": EOS_PHASE_LAYERS[key],
+            "show_legend": key not in shown,
+        })
+        shown.add(key)
 
     llcp = pd.get("LLCP")
     if llcp is not None:
@@ -376,48 +322,22 @@ def _add_phase_overlay_surface2d(fig, model_key, T_range, P_range):
         logger.warning("phase 2D computation failed for %s", model_key, exc_info=True)
         return
 
-    # Spinodal: two branches, single legend entry.
-    spinodal = pd.get("spinodal")
-    if spinodal is not None:
-        p_arr = np.asarray(spinodal["p_array"])
-        first = True
-        for branch_key in ("T_upper", "T_lower"):
-            T_branch = np.asarray(spinodal.get(branch_key, []))
-            if T_branch.size == 0:
-                continue
-            mask = (np.isfinite(T_branch)
-                    & _clip_phase_tp(T_branch, p_arr, T_range, P_range))
-            if not mask.any():
-                continue
-            fig.add_trace(go.Scatter(
-                x=T_branch[mask].tolist(), y=p_arr[mask].tolist(),
-                mode="lines",
-                name="Spinodal" if first else None,
-                showlegend=first,
-                line=dict(color=PHASE_SPINODAL_COLOR, width=1.5, dash="dash"),
-                hovertemplate=(
-                    "Spinodal<br>T=%{x:.2f} K<br>P=%{y:.2f} MPa<extra></extra>"
-                ),
-            ))
-            first = False
-
-    # Binodal: single curve in (T_binodal, p_array) coords.
-    binodal = pd.get("binodal")
-    if binodal is not None:
-        T_bn = np.asarray(binodal.get("T_binodal", []))
-        p_arr = np.asarray(binodal.get("p_array", []))
-        if T_bn.size > 0 and p_arr.size == T_bn.size:
-            mask = (np.isfinite(T_bn)
-                    & _clip_phase_tp(T_bn, p_arr, T_range, P_range))
-            if mask.any():
-                fig.add_trace(go.Scatter(
-                    x=T_bn[mask].tolist(), y=p_arr[mask].tolist(),
-                    mode="lines", name="Binodal",
-                    line=dict(color=PHASE_BINODAL_COLOR, width=1.5),
-                    hovertemplate=(
-                        "Binodal<br>T=%{x:.2f} K<br>P=%{y:.2f} MPa<extra></extra>"
-                    ),
-                ))
+    # Liquid-liquid lines in T-P coordinates, one trace per stretch inside
+    # the window; one legend entry per line.
+    shown = set()
+    for run in _phase_line_runs(pd, model_key, T_range, P_range):
+        key = run["key"]
+        label = EOS_PHASE_LAYERS[key]
+        fig.add_trace(go.Scatter(
+            x=run["T"].tolist(), y=run["P"].tolist(),
+            mode="lines",
+            name=label, legendgroup=key, showlegend=key not in shown,
+            line=_phase_line_style(run["kind"]),
+            hovertemplate=(
+                f"{label}<br>T=%{{x:.2f}} K<br>P=%{{y:.2f}} MPa<extra></extra>"
+            ),
+        ))
+        shown.add(key)
 
     # LLCP: single marker.
     llcp = pd.get("LLCP")
@@ -451,6 +371,7 @@ def _add_phase_overlay_surface3d(fig, model_key, prop_key, T_range, P_range, uni
         common = dict(
             x=list(seg["T"]), y=list(seg["P"]), z=list(prop_vals),
             name=seg.get("name"), showlegend=bool(seg.get("show_legend")),
+            legendgroup=seg.get("group"),
         )
         if seg["type"] == "llcp":
             fig.add_trace(go.Scatter3d(
