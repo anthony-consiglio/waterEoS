@@ -78,6 +78,7 @@ const INFO = {
   liquid: 'holten2014',
   model: 'ove_fitted_BC',
   ices: ['Ih', 'III'],
+  hydrates: [{ name: 'hydrohalite', formula: 'NaCl·2H2O', W: 0.6186, note: 'provisional' }],
   vapor: true,
   T_min: 229.2,
   p_min: 1e-6,
@@ -148,6 +149,7 @@ describe('H2OPhaseDiagram screen (the water + NaCl atlas)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Model' }));
     expect(await screen.findByText(/release 2026-01-01-abcdef12/)).toBeInTheDocument();
     expect(screen.getByText('Ih, III (SeaFreeze)')).toBeInTheDocument();
+    expect(screen.getByText('hydrohalite (NaCl·2H2O, 61.9 wt %): provisional')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Invariant points' }));
     expect(await screen.findByText('L + Ih + vapor')).toBeInTheDocument();
     expect(screen.getByText('612 Pa')).toBeInTheDocument();
