@@ -51,7 +51,7 @@ def _assert_identical(whole, pieces):
 # The ranges run past each model's domain on purpose, so that the NaN
 # results are compared as well as the finite ones.
 @pytest.mark.parametrize("name", ["holten", "caupin", "caupin_kim", "duska",
-                                  "bridge29"])
+                                  "bridge29", "local26"])
 @pytest.mark.parametrize("branch", ["stable", "hdl", "ldl"])
 def test_two_state_batch_is_independent_of_batch_size(name, branch):
     fn = getattr(watereos_rs, f"compute_batch_{name}")

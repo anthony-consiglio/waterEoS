@@ -1,11 +1,14 @@
-//! Bridge29 equation of state and transport model — Rust implementation.
+//! Bridge29's two-state equation of state — Rust implementation — and the
+//! Bridge29 model with its transport model.
 //!
-//! Port of `watereos/bridge29/core.py` (Gibbs energy of the two states,
-//! regular-mixture equilibrium, finite-barrier transport) and
+//! Port of `watereos/bridge29/equation.py` (Gibbs energy of the two states
+//! and regular-mixture equilibrium), `watereos/bridge29/core.py`
+//! (Bridge29's coefficients and finite-barrier transport) and
 //! `watereos/bridge29/ice.py` (IAPWS-06 ice Ih reference of the
-//! low-density state). The parameters are those of
-//! `watereos/data/bridge29.json`; `tests/test_bridge29_rust.py` compares
-//! this backend with the NumPy one.
+//! low-density state). The equation takes its coefficients from a
+//! `Model`: `BRIDGE29` here, from `watereos/data/bridge29.json`, and
+//! `LOCAL26` in local26.rs. `tests/test_bridge29_rust.py` compares this
+//! backend with the NumPy one for both.
 //!
 //! The NumPy core takes the second derivatives of the high-density state
 //! by a complex step through its analytic first derivatives. Here the same
@@ -34,76 +37,171 @@ use crate::par::map_indexed;
 const PAR_GRAIN: usize = 64;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Parameters (watereos/data/bridge29.json)
+// Coefficients
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Low-density state: ice Ih plus an Einstein oscillator and a quadratic
-// volume.
-const H_L: f64 = 1377.3715209469667;
-const S_L: f64 = 1.586288424208464;
-const N_L: f64 = 0.2506041387887622;
-const TH_L: f64 = 455.7686039688983;
-const V_L: f64 = 0.4017001993517383;
-const K_L: f64 = 0.0036547291640662864;
+/// The "thermodynamics" coefficients of a JSON file in `watereos/data`.
+/// The 250 K and 2000 K oscillator amplitudes `n_H1` and `n_H4` are zero
+/// in every fitted equation and have no term in the NumPy core; they are
+/// left out.
+pub struct Thermodynamics {
+    // Low-density state: ice Ih plus an Einstein oscillator and a
+    // quadratic volume.
+    pub h_l: f64,
+    pub s_l: f64,
+    pub n_l: f64,
+    pub th_l: f64,
+    pub v_l: f64,
+    pub k_l: f64,
+    // High-density state: spinodal backbone, oscillators of 100, 500 and
+    // 1000 K, and a two-level excitation.
+    pub h_h: f64,
+    pub s_h: f64,
+    pub n_h0: f64,
+    pub n_h2: f64,
+    pub n_h3: f64,
+    /// Chebyshev coefficients, in t = (T_eff - 200 K) / 100 K, of the
+    /// reduced spinodal pressure, spinodal volume, curvature and cubic
+    /// coefficient.
+    pub ps: [f64; 3],
+    pub vs: [f64; 3],
+    pub ph: [f64; 3],
+    pub cs: [f64; 3],
+    pub e_x: f64,
+    pub v_x: f64,
+    pub lg_x: f64,
+    // Interaction W = w0 + w1 p and cooperative unit N_c.
+    pub w0: f64,
+    pub w1: f64,
+    pub n_c: f64,
+}
 
-// High-density state: spinodal backbone, oscillators and a two-level
-// excitation. The terms n_H1 and n_H4 of the JSON file are zero and have
-// no oscillator temperature in the NumPy core; they are left out.
-const H_H: f64 = -15647.111715885247;
-const S_H: f64 = -62.085975698493286;
-const N_H0: f64 = 2.1914175864177485;
-const N_H2: f64 = 0.394998044816933;
-const N_H3: f64 = 7.806688870520927;
+/// Coefficients of the equation, with the power series derived from the
+/// Chebyshev ones.
+pub struct Equation {
+    q: Thermodynamics,
+    rm: f64,
+    oscillators: [(f64, f64); 3],
+    ps: [f64; 3],
+    vs: [f64; 3],
+    phi: [f64; 3],
+    cubic: [f64; 3],
+    ps_t: [f64; 2],
+    vs_t: [f64; 2],
+    phi_t: [f64; 2],
+    cubic_t: [f64; 2],
+    ivp: [f64; 5],
+}
 
-// Chebyshev coefficients, in t = (T_eff - 200 K) / 100 K, of the reduced
-// spinodal pressure, spinodal volume, curvature and cubic coefficient.
-const PS_CHEB: [f64; 3] = [-16.476275297992373, 4.908190530393981, 0.06838132520267964];
-const VS_CHEB: [f64; 3] = [0.09490898148840093, -0.0046046164216466245, 0.0010524037848080204];
-const PH_CHEB: [f64; 3] = [2.145175311983132, 0.17398741013997943, -0.045411054417580005];
-const CS_CHEB: [f64; 3] = [1.7821543152798973, 4.111094943821056, 1.1649134148860336];
-
-const E_X: f64 = 6213.2180148850275;
-const V_X: f64 = 0.3185366889545743;
-const LG_X: f64 = 2.0689886436420397;
-
-// Interaction W = w0 + w1 p and cooperative unit N_c.
-const W0: f64 = 1267.21223944121;
-const W1: f64 = 1.9129529997859995;
-const N_C: f64 = 2.72187158781023;
-
-// Shape of the transport crossover f(T, p).
-const T50_K: f64 = 194.3160582773401;
-const WIDTH_K: f64 = 19.312214633533802;
-const SLOPE_K_PER_MPA: f64 = -0.13545670620144795;
-const CURV_K_PER_100MPA2: f64 = 2.503813584844022;
+impl Equation {
+    pub const fn new(q: Thermodynamics) -> Self {
+        let ps = cheb_to_poly(q.ps);
+        let vs = cheb_to_poly(q.vs);
+        let ps_t = poly_deriv(ps);
+        let phi = cheb_to_poly(q.ph);
+        let cubic = cheb_to_poly(q.cs);
+        Equation {
+            rm: R / q.n_c,
+            oscillators: [(100.0, q.n_h0), (500.0, q.n_h2), (1000.0, q.n_h3)],
+            ps,
+            vs,
+            phi,
+            cubic,
+            ps_t,
+            vs_t: poly_deriv(vs),
+            phi_t: poly_deriv(phi),
+            cubic_t: poly_deriv(cubic),
+            // Integral of VS * dPS/dt, zero at t = 0, as power-series
+            // coefficients.
+            ivp: [
+                0.0,
+                vs[0] * ps_t[0],
+                (vs[0] * ps_t[1] + vs[1] * ps_t[0]) / 2.0,
+                (vs[1] * ps_t[1] + vs[2] * ps_t[0]) / 3.0,
+                vs[2] * ps_t[1] / 4.0,
+            ],
+            q,
+        }
+    }
+}
 
 /// Arrhenius coefficients of one transport property: intercept, barrier of
 /// the high-density limit and its increment (both in units of 1000 K), and
 /// the pressure dependence of the barrier (K/MPa).
-struct Barrier {
+pub struct Barrier {
     intercept: f64,
     high_e: f64,
     increment_e: f64,
     pressure_e: f64,
 }
 
-const ETA: Barrier = Barrier {
-    intercept: -13.284539631092649,
-    high_e: 1.7779814610169826,
-    increment_e: 3.4187922255664653,
-    pressure_e: 0.21294087776077886,
-};
-const DIFF: Barrier = Barrier {
-    intercept: -13.731437697071756,
-    high_e: 1.784315877723145,
-    increment_e: 2.7015103950801422,
-    pressure_e: 0.156398099578009,
-};
-const TAU_R: Barrier = Barrier {
-    intercept: -33.134869040133495,
-    high_e: 1.7283905696754644,
-    increment_e: 3.386043386738633,
-    pressure_e: 2.6103916289053146e-37,
+/// Bridge29's transport model: the shape of the crossover f(T, p) and the
+/// barriers of eta, D and tau_r.
+pub struct Transport {
+    t50_k: f64,
+    width_k: f64,
+    slope_k_per_mpa: f64,
+    curv_k_per_100mpa2: f64,
+    eta: Barrier,
+    diff: Barrier,
+    tau_r: Barrier,
+}
+
+/// An equation with its coefficients, and a transport model if it has one.
+pub struct Model {
+    pub equation: Equation,
+    pub transport: Option<Transport>,
+}
+
+/// watereos/data/bridge29.json
+const BRIDGE29: Model = Model {
+    equation: Equation::new(Thermodynamics {
+        h_l: 1377.3715209469667,
+        s_l: 1.586288424208464,
+        n_l: 0.2506041387887622,
+        th_l: 455.7686039688983,
+        v_l: 0.4017001993517383,
+        k_l: 0.0036547291640662864,
+        h_h: -15647.111715885247,
+        s_h: -62.085975698493286,
+        n_h0: 2.1914175864177485,
+        n_h2: 0.394998044816933,
+        n_h3: 7.806688870520927,
+        ps: [-16.476275297992373, 4.908190530393981, 0.06838132520267964],
+        vs: [0.09490898148840093, -0.0046046164216466245, 0.0010524037848080204],
+        ph: [2.145175311983132, 0.17398741013997943, -0.045411054417580005],
+        cs: [1.7821543152798973, 4.111094943821056, 1.1649134148860336],
+        e_x: 6213.2180148850275,
+        v_x: 0.3185366889545743,
+        lg_x: 2.0689886436420397,
+        w0: 1267.21223944121,
+        w1: 1.9129529997859995,
+        n_c: 2.72187158781023,
+    }),
+    transport: Some(Transport {
+        t50_k: 194.3160582773401,
+        width_k: 19.312214633533802,
+        slope_k_per_mpa: -0.13545670620144795,
+        curv_k_per_100mpa2: 2.503813584844022,
+        eta: Barrier {
+            intercept: -13.284539631092649,
+            high_e: 1.7779814610169826,
+            increment_e: 3.4187922255664653,
+            pressure_e: 0.21294087776077886,
+        },
+        diff: Barrier {
+            intercept: -13.731437697071756,
+            high_e: 1.784315877723145,
+            increment_e: 2.7015103950801422,
+            pressure_e: 0.156398099578009,
+        },
+        tau_r: Barrier {
+            intercept: -33.134869040133495,
+            high_e: 1.7283905696754644,
+            increment_e: 3.386043386738633,
+            pressure_e: 2.6103916289053146e-37,
+        },
+    }),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -111,7 +209,6 @@ const TAU_R: Barrier = Barrier {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const R: f64 = 8.314462;
-const RM: f64 = R / N_C;
 const M: f64 = 0.018015268; // kg/mol
 const P_SCALE: f64 = 22.064;
 const G_SCALE: f64 = 461.523 * 647.096 * M;
@@ -125,24 +222,6 @@ const fn cheb_to_poly(c: [f64; 3]) -> [f64; 3] {
 const fn poly_deriv(p: [f64; 3]) -> [f64; 2] {
     [p[1], 2.0 * p[2]]
 }
-
-const PS: [f64; 3] = cheb_to_poly(PS_CHEB);
-const VS: [f64; 3] = cheb_to_poly(VS_CHEB);
-const PHI: [f64; 3] = cheb_to_poly(PH_CHEB);
-const CUBIC: [f64; 3] = cheb_to_poly(CS_CHEB);
-const PS_T: [f64; 2] = poly_deriv(PS);
-const VS_T: [f64; 2] = poly_deriv(VS);
-const PHI_T: [f64; 2] = poly_deriv(PHI);
-const CUBIC_T: [f64; 2] = poly_deriv(CUBIC);
-
-/// Integral of VS * dPS/dt, zero at t = 0, as power-series coefficients.
-const IVP: [f64; 5] = [
-    0.0,
-    VS[0] * PS_T[0],
-    (VS[0] * PS_T[1] + VS[1] * PS_T[0]) / 2.0,
-    (VS[1] * PS_T[1] + VS[2] * PS_T[0]) / 3.0,
-    VS[2] * PS_T[1] / 4.0,
-];
 
 /// Power series c[0] + c[1] t + ... by Horner's rule.
 #[inline(always)]
@@ -327,24 +406,26 @@ fn oscillator<const N: usize>(t: Dual<N>, theta: f64) -> (Dual<N>, Dual<N>, Dual
 
 /// Low-density state: (g, g_T, g_p, g_TT, g_Tp, g_pp).
 #[inline]
-fn low(t: f64, p: f64) -> [f64; 6] {
+fn low(e: &Equation, t: f64, p: f64) -> [f64; 6] {
+    let q = &e.q;
     let [g, gt, gp, gtt, gtp, gpp] = ice(t, p);
-    let (a, at, att) = oscillator(Dual::<0>::cst(t), TH_L);
+    let (a, at, att) = oscillator(Dual::<0>::cst(t), q.th_l);
     [
-        g + H_L - t * S_L + N_L * a.v + p * (V_L - 0.5 * K_L * p),
-        gt - S_L + N_L * at.v,
-        gp + V_L - K_L * p,
-        gtt + N_L * att.v,
+        g + q.h_l - t * q.s_l + q.n_l * a.v + p * (q.v_l - 0.5 * q.k_l * p),
+        gt - q.s_l + q.n_l * at.v,
+        gp + q.v_l - q.k_l * p,
+        gtt + q.n_l * att.v,
         gtp,
-        gpp - K_L,
+        gpp - q.k_l,
     ]
 }
 
 /// High-density state: G, G_T and G_p, each with its T and p derivatives.
 /// NaN beyond the liquid-vapor spinodal of the state.
 #[inline]
-fn high(t: f64, p: f64) -> [Dual<2>; 3] {
+fn high(e: &Equation, t: f64, p: f64) -> [Dual<2>; 3] {
     const NAN: Dual<2> = Dual { v: f64::NAN, d: [f64::NAN; 2] };
+    let q = &e.q;
     let tk = Dual::<2>::var(t, 0);
     let pm = Dual::<2>::var(p, 1);
 
@@ -353,15 +434,15 @@ fn high(t: f64, p: f64) -> [Dual<2>; 3] {
     let x = (teff - 200.0) / 100.0;
     let r = tk / teff;
     let dt = r * (r * r) / 100.0;
-    let ps = poly(&PS, x);
-    let vs = poly(&VS, x);
-    let phi = poly(&PHI, x);
-    let c = poly(&CUBIC, x);
-    let ps_t = poly(&PS_T, x);
-    let vs_t = poly(&VS_T, x);
-    let c_t = poly(&CUBIC_T, x);
+    let ps = poly(&e.ps, x);
+    let vs = poly(&e.vs, x);
+    let phi = poly(&e.phi, x);
+    let c = poly(&e.cubic, x);
+    let ps_t = poly(&e.ps_t, x);
+    let vs_t = poly(&e.vs_t, x);
+    let c_t = poly(&e.cubic_t, x);
     let b = -phi / (2.0 * ps * vs.square());
-    let b_t = b * (poly(&PHI_T, x) / phi - ps_t / ps - 2.0 * vs_t / vs);
+    let b_t = b * (poly(&e.phi_t, x) / phi - ps_t / ps - 2.0 * vs_t / vs);
     let y = 1.0 - pm / (P_SCALE * ps);
     let valid = ps.v < 0.0
         && vs.v > 0.0
@@ -387,21 +468,21 @@ fn high(t: f64, p: f64) -> [Dual<2>; 3] {
     let j3 = 3.0 * (0.5 * d * d - d + logv);
     let j = b * j2 + c * j3;
     let j_t = b_t * j2 + c_t * j3 + d * (2.0 * b + 3.0 * c * d) / (1.0 + d) * d_t;
-    let mut g = G_SCALE * (poly(&IVP, x) - ps * vs * j) + H_H - tk * S_H;
-    let mut gt = G_SCALE * dt * (vs * ps_t - (ps_t * vs + ps * vs_t) * j - ps * vs * j_t) - S_H;
+    let mut g = G_SCALE * (poly(&e.ivp, x) - ps * vs * j) + q.h_h - tk * q.s_h;
+    let mut gt = G_SCALE * dt * (vs * ps_t - (ps_t * vs + ps * vs_t) * j - ps * vs * j_t) - q.s_h;
     let mut gp = G_SCALE / P_SCALE * vs / (1.0 + d);
-    for (theta, n) in [(100.0, N_H0), (500.0, N_H2), (1000.0, N_H3)] {
+    for (theta, n) in e.oscillators {
         let (a, at, _) = oscillator(tk, theta);
         g = g + n * a;
         gt = gt + n * at;
     }
-    let gap = E_X + pm * V_X;
-    let excitation = (LG_X - gap / (R * tk)).exp();
+    let gap = q.e_x + pm * q.v_x;
+    let excitation = (q.lg_x - gap / (R * tk)).exp();
     let population = excitation / (1.0 + excitation);
     let log_partition = excitation.ln_1p();
     g = g - 2.0 * R * tk * log_partition;
     gt = gt - 2.0 * (R * log_partition + gap / tk * population);
-    gp = gp + 2.0 * V_X * population;
+    gp = gp + 2.0 * q.v_x * population;
     [g, gt, gp]
 }
 
@@ -435,16 +516,17 @@ const STATE_KEYS: [&str; 13] = [
 
 /// Crossover fraction f, then eta, D and tau_r.
 #[inline]
-fn transport(t: f64, p: f64) -> [f64; 4] {
+fn transport(m: &Transport, t: f64, p: f64) -> [f64; 4] {
     let dp = p - 0.1;
-    let midpoint = T50_K + SLOPE_K_PER_MPA * dp + CURV_K_PER_100MPA2 * ((dp / 100.0) * (dp / 100.0));
-    let z = (midpoint - t) * 220.0 / (t * WIDTH_K);
+    let midpoint = m.t50_k + m.slope_k_per_mpa * dp
+        + m.curv_k_per_100mpa2 * ((dp / 100.0) * (dp / 100.0));
+    let z = (midpoint - t) * 220.0 / (t * m.width_k);
     let f = 1.0 / (1.0 + (-z).exp());
     let rate = |c: &Barrier, sign: f64| -> f64 {
         let barrier = 1000.0 * (c.high_e + c.increment_e * f) + dp * c.pressure_e;
         (c.intercept + sign * barrier / t).exp()
     };
-    [f, t / 273.15 * rate(&ETA, 1.0), rate(&DIFF, -1.0), rate(&TAU_R, 1.0)]
+    [f, t / 273.15 * rate(&m.eta, 1.0), rate(&m.diff, -1.0), rate(&m.tau_r, 1.0)]
 }
 
 const TRANSPORT_KEYS: [&str; 4] = ["f", "eta", "D", "tau_r"];
@@ -471,7 +553,7 @@ struct PointResult {
 const NAN13: [f64; 13] = [f64::NAN; 13];
 
 #[inline]
-fn compute_point(t: f64, p: f64, branch: Branch) -> PointResult {
+fn compute_point(m: &Model, t: f64, p: f64, branch: Branch) -> PointResult {
     let missing = PointResult {
         mix: NAN13,
         x: f64::NAN,
@@ -483,32 +565,34 @@ fn compute_point(t: f64, p: f64, branch: Branch) -> PointResult {
     if !(t > 0.0) {
         return missing;
     }
-    let [hg, hgt, hgp] = high(t, p);
+    let e = &m.equation;
+    let [hg, hgt, hgp] = high(e, t, p);
     let hi = [hg.v, hgt.v, hgp.v, hgt.d[0], hgp.d[0], hgp.d[1]];
-    let lo = low(t, p);
+    let lo = low(e, t, p);
     if !(hi[0].is_finite() && lo[0].is_finite()) {
         return missing;
     }
 
+    let (rm, w1) = (e.rm, e.q.w1);
     let delta = lo[0] - hi[0];
     let delta_t = lo[1] - hi[1];
     let delta_p = lo[2] - hi[2];
-    let w = W0 + p * W1;
-    let (x, metastable) = select_branch(delta / (RM * t), w / (RM * t), branch);
+    let w = e.q.w0 + p * w1;
+    let (x, metastable) = select_branch(delta / (rm * t), w / (rm * t), branch);
 
     let xx = x * (1.0 - x);
     let entropy_term = xlogx(x) + xlogx(1.0 - x);
-    let curvature = RM * t / xx - 2.0 * w;
+    let curvature = rm * t / xx - 2.0 * w;
     // A response at a spinodal is singular. First-derivative properties
     // remain defined.
     let inv = if curvature.abs() < 1e-9 { f64::NAN } else { 1.0 / curvature };
-    let ft = delta_t + RM * (x.clamp(1e-300, 1.0) / (1.0 - x).clamp(1e-300, 1.0)).ln();
-    let fp = delta_p + W1 * (1.0 - 2.0 * x);
+    let ft = delta_t + rm * (x.clamp(1e-300, 1.0) / (1.0 - x).clamp(1e-300, 1.0)).ln();
+    let fp = delta_p + w1 * (1.0 - 2.0 * x);
     let avg: [f64; 6] = std::array::from_fn(|k| (1.0 - x) * hi[k] + x * lo[k]);
     let mix = properties(t, p, [
-        avg[0] + RM * t * entropy_term + w * xx,
-        avg[1] + RM * entropy_term,
-        avg[2] + W1 * xx,
+        avg[0] + rm * t * entropy_term + w * xx,
+        avg[1] + rm * entropy_term,
+        avg[2] + w1 * xx,
         avg[3] - ft * ft * inv,
         avg[4] - ft * fp * inv,
         avg[5] - fp * fp * inv,
@@ -516,7 +600,10 @@ fn compute_point(t: f64, p: f64, branch: Branch) -> PointResult {
     let mut r = PointResult {
         mix,
         x,
-        transport: transport(t, p),
+        transport: match &m.transport {
+            Some(tr) => transport(tr, t, p),
+            None => [f64::NAN; 4],
+        },
         state_a: properties(t, p, hi),
         state_b: properties(t, p, lo),
         metastable,
@@ -531,17 +618,16 @@ fn compute_point(t: f64, p: f64, branch: Branch) -> PointResult {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PyO3 entry point
+// Batch evaluation and the PyO3 entry point
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Bridge29 properties at points (T [K], p [MPa]): the keys of
-/// `watereos.bridge29.core.compute_batch`. `branch` is "stable" (default),
-/// "hdl" or "ldl"; see branch.rs. With a named branch the result also has
-/// `metastable`.
-#[pyfunction]
-#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
-pub fn compute_batch_bridge29<'py>(
+/// Properties of `model` at points (T [K], p [MPa]), with the keys of the
+/// NumPy `Equation.compute_batch` in the same order: the mixture, `x`, the
+/// transport keys if the model has a transport model, the two pure states,
+/// and `metastable` on a named branch.
+pub fn compute_batch<'py>(
     py: Python<'py>,
+    model: &Model,
     t_k: PyReadonlyArray1<'py, f64>,
     p_mpa: PyReadonlyArray1<'py, f64>,
     branch: &str,
@@ -567,7 +653,7 @@ pub fn compute_batch_bridge29<'py>(
     let n = t_data.len();
 
     let points: Vec<PointResult> = py.allow_threads(|| {
-        map_indexed(n, PAR_GRAIN, |i| compute_point(t_data[i], p_data[i], branch))
+        map_indexed(n, PAR_GRAIN, |i| compute_point(model, t_data[i], p_data[i], branch))
     });
 
     let dict = PyDict::new(py);
@@ -578,8 +664,10 @@ pub fn compute_batch_bridge29<'py>(
         dict.set_item(*key, column(&|r| r.mix[k]).into_pyarray(py))?;
     }
     dict.set_item("x", column(&|r| r.x).into_pyarray(py))?;
-    for (k, key) in TRANSPORT_KEYS.iter().enumerate() {
-        dict.set_item(*key, column(&|r| r.transport[k]).into_pyarray(py))?;
+    if model.transport.is_some() {
+        for (k, key) in TRANSPORT_KEYS.iter().enumerate() {
+            dict.set_item(*key, column(&|r| r.transport[k]).into_pyarray(py))?;
+        }
     }
     for (k, key) in STATE_KEYS.iter().enumerate() {
         dict.set_item(format!("{key}_A"), column(&|r| r.state_a[k]).into_pyarray(py))?;
@@ -592,4 +680,19 @@ pub fn compute_batch_bridge29<'py>(
         dict.set_item("metastable", meta.into_pyarray(py))?;
     }
     Ok(dict)
+}
+
+/// Bridge29 properties at points (T [K], p [MPa]): the keys of
+/// `watereos.bridge29.core.compute_batch`. `branch` is "stable" (default),
+/// "hdl" or "ldl"; see branch.rs. With a named branch the result also has
+/// `metastable`.
+#[pyfunction]
+#[pyo3(signature = (t_k, p_mpa, branch="stable"))]
+pub fn compute_batch_bridge29<'py>(
+    py: Python<'py>,
+    t_k: PyReadonlyArray1<'py, f64>,
+    p_mpa: PyReadonlyArray1<'py, f64>,
+    branch: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    compute_batch(py, &BRIDGE29, t_k, p_mpa, branch)
 }

@@ -40,9 +40,12 @@ def test_surface2d_overlay(model):
         assert t.name == LAYERS[t.legendgroup]
         assert max_step(t.x) < MAX_STEP and max_step(t.y) < MAX_STEP
         assert min(t.x) >= WINDOW['T_range'][0] and max(t.y) <= WINDOW['P_range'][1]
-    # Every model's HDL stability limit is traced down to 100 K, and nothing lower.
+    # Every model's HDL stability limit is traced down to 100 K, and nothing
+    # lower. Local26's ends at 133.0 K, where it meets the fold of the
+    # high-density state's expansion and that state stops existing.
     hdl = [t for t in lines if t.legendgroup == 'hdl_spinodal']
-    assert min(min(t.x) for t in hdl) == pytest.approx(T_FLOOR, abs=1e-6)
+    end = 133.00626 if model == 'local26' else T_FLOOR
+    assert min(min(t.x) for t in hdl) == pytest.approx(end, abs=1e-5)
     assert min(min(t.x) for t in lines) >= T_FLOOR - 1e-6
     assert any((t.name or '').startswith('LLCP') for t in fig.data)
 

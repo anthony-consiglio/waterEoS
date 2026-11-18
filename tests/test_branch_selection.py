@@ -27,6 +27,7 @@ TWO_STATE = {
     # Bridge29's HDL limit turns back in pressure at 142.7 MPa, so its
     # isobar stays well below that.
     'bridge29': ('watereos.bridge29', 40.0),
+    'local26': ('watereos.local26', 40.0),
 }
 MIX_KEYS = ['rho', 'V', 'S', 'G', 'H', 'U', 'A', 'Cp', 'Cv', 'Kt', 'Ks',
             'alpha', 'vel', 'x']
@@ -52,9 +53,9 @@ def _tol(key):
 def _lines(model):
     """Pressure, binodal and both spinodal temperatures at one pressure."""
     pkg, dp = TWO_STATE[model]
-    # Bridge29 keeps these routines in its `phase` module, and its binodal
-    # temperature is keyed 'T_K'.
-    if model == 'bridge29':
+    # Bridge29 and Local26 keep these routines in their `phase` modules, and
+    # their binodal temperature is keyed 'T_K'.
+    if model in ('bridge29', 'local26'):
         pd, t_key = importlib.import_module(f'{pkg}.phase'), 'T_K'
     else:
         pd, t_key = importlib.import_module(f'{pkg}.phase_diagram'), 'T_binodal'
@@ -305,7 +306,8 @@ def _backends(model):
     name = {'holten2014': 'compute_batch_holten',
             'caupin2019': 'compute_batch_caupin',
             'duska2020': 'compute_batch_duska',
-            'bridge29': 'compute_batch_bridge29'}[model]
+            'bridge29': 'compute_batch_bridge29',
+            'local26': 'compute_batch_local26'}[model]
     if not hasattr(rs, name):
         pytest.skip(f'installed watereos_rs has no {name}')
     core = importlib.import_module(f'{TWO_STATE[model][0]}.core')
