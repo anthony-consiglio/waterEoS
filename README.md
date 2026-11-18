@@ -36,7 +36,7 @@ All four return 43 thermodynamic properties: 15 mixture properties, 14 per state
 
 Try waterEoS interactively at **[watereos-visualizer.up.railway.app](https://watereos-visualizer.up.railway.app)**
 
-The web app includes a Property Explorer, an EoS phase diagram viewer (per model: spinodals, binodal, LLCP, TMD, Widom line, Kauzmann, ice liquidus, homogeneous nucleation), an **H₂O solid-liquid-vapor phase diagram** with T&ndash;V, T&ndash;P, and 3-D P&ndash;T&ndash;V projections (Liquid + Ice Ih, II, III, V, VI, VII/X + Vapor, with L&ndash;V saturation and Ih&ndash;V sublimation curves), a model comparison tool, and a point calculator.
+The web app includes a Property Explorer, an EoS phase diagram viewer (per two-state model, 100&ndash;375 K and &minus;400 to 420 MPa: liquid-liquid coexistence, critical point and stability limits, Widom line, liquid-vapor stability limit and coexistence, homogeneous nucleation, model melting lines of ices Ih, III and V, maxima and minima of density, compressibility, sound speed and heat capacity, and measured reference points), an **H₂O solid-liquid-vapor phase diagram** with T&ndash;V, T&ndash;P, and 3-D P&ndash;T&ndash;V projections (Liquid + Ice Ih, II, III, V, VI, VII/X + Vapor, with L&ndash;V saturation and Ih&ndash;V sublimation curves), a model comparison tool, and a point calculator.
 
 <p align="center">
   <img src="docs/info_hero.png" alt="waterEoS web app" width="700"><br>
@@ -343,6 +343,33 @@ result = compute_phase_diagram()
 
 Available functions: `find_LLCP()`, `compute_spinodal_curve()`, `compute_binodal_curve()`, `compute_phase_diagram()`.
 
+### EoS phase diagram figure
+
+`watereos.eos_phase_diagram` computes and draws the phase diagram shown in the visualizer's EoS Phase Diagram tab, for `caupin2019`, `caupin2019_kim`, `duska2020` and `holten2014`. One panel, 100&ndash;375 K and &minus;400 to 420 MPa:
+
+- the liquid-liquid coexistence line, its critical point, and the stability limits of the high- and low-density liquids;
+- the Widom line, where the two liquid fractions are equal above the critical point;
+- the liquid-vapor stability limit (where the model has one) and the liquid-vapor coexistence of the model liquid;
+- the homogeneous nucleation line of Holten et al. (2014), Appendix A;
+- the melting lines of ices Ih, III and V that the model predicts, where the liquid Gibbs energy equals that of the ice (IAPWS-06 for ice Ih, without its range check, so the line extends to negative pressure; SeaFreeze for ices III and V);
+- maxima (solid) and minima (dashed) of density, isothermal compressibility and sound speed along isobars, and of isobaric heat capacity along isotherms;
+- measured reference points: melting points of ices Ih, III and V, density maxima, warm compressibility minima and sound-speed maxima, and Troncoso's heat-capacity minima, with their sources in `watereos/data/phase_diagram_reference.json` (built by `scripts/build_phase_diagram_reference.py`).
+
+```python
+from watereos.eos_phase_diagram import compute_eos_phase_diagram, plot_eos_phase_diagram
+
+data = compute_eos_phase_diagram('caupin2019')  # (n, 2) arrays of (T [K], p [MPa])
+data['llcp']              # {'T_K': 218.13, 'p_MPa': 71.95}
+data['binodal']           # liquid-liquid coexistence, starting at the critical point
+data['melting']['Ih']     # the model's ice Ih melting line
+data['extrema']['density']['max']   # temperature of maximum density, and its continuation
+
+fig = plot_eos_phase_diagram('caupin2019', theme='light')  # Plotly, in the visualizer's style
+fig.show()
+```
+
+Curves go down to 100 K and up to 400 MPa wherever the model has them. Below about 150 K some models' liquid-liquid lines are reentrant (for `caupin2019` the coexistence line peaks at 330 MPa near 122 K and turns back to lower pressure), so the lines are traced as contours on a temperature-pressure grid, refined by bisection, rather than solved one pressure at a time. A diagram takes 1&ndash;2 s with the Rust extension (about 6 s without it) and is cached for the session. `plot_eos_phase_diagram` needs plotly (`pip install "waterEoS[web]"`); `show` selects layers (see `LAYERS`), and the Kauzmann line is available as an extra layer.
+
 ### Metastable liquid branches
 
 Below the liquid-liquid critical point the two-state models have two liquid states between the spinodals: the high-density liquid (HDL) and the low-density liquid (LDL). By default `getProp()` and `compute()` return the one with the lowest Gibbs energy, so every property jumps at the liquid-liquid transition. The `branch` argument follows one liquid instead, through the transition and into its metastable range:
@@ -529,6 +556,8 @@ fallback is used. Results are identical; only speed differs.
 8. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment, the `vapor` model (ideal-gas part and virial coefficients), and the saturation/triple-point lines in the H₂O phase diagram.
 
 9. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation (`vapor_eos.sublimation_pressure`), drawn as the Ice Ih/vapor reference curve below 273.16 K in the H₂O phase diagram.
+
+10. R. Feistel and W. Wagner, "A New Equation of State for H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **35**, 1021 (2006). [doi:10.1063/1.2183324](https://doi.org/10.1063/1.2183324) -- IAPWS R10-06 Gibbs function of ice Ih, used for the ice Ih melting line of the EoS phase diagram.
 
 ## Authors
 

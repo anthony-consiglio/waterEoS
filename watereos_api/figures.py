@@ -14,6 +14,7 @@ from watereos.computation import (
     compute_property_surface,
 )
 from watereos.model_registry import MODEL_REGISTRY
+from watereos.eos_phase_diagram import plot_eos_phase_diagram
 from watereos.tv_phase_diagram import (
     compute_tv_phase_diagram,
     plot_tv_phase_diagram_plotly,
@@ -566,112 +567,17 @@ def build_surface3d_figure(*, model, prop, T_range, P_range, n_points,
 # EoS phase diagram figure builder
 # ---------------------------------------------------------------------------
 
-_PD_STYLES = {
-    "binodal":      dict(color="#9333ea", dash="solid", width=2),
-    "hdl_spinodal": dict(color="#ec4899", dash="dash", width=2),
-    "ldl_spinodal": dict(color="#be185d", dash="dot", width=2),
-    "tmd":          dict(color="#ffffff", dash="dash", width=2),
-    "widom":        dict(color="#f97316", dash="dashdot", width=2),
-    "ice_ih":       dict(color="#3b82f6", dash="solid", width=2),
-    "ice_iii":      dict(color="#ef4444", dash="solid", width=2),
-    # nuc_ih is the homogeneous Ih nucleation locus (Thom / T_H line). It
-    # used to share gray with nuc_iii, but with the Kauzmann line no longer
-    # in the default Info-hero overlay set, the bright green it used to
-    # occupy is now repurposed for the Thom curve so it stands out as the
-    # most physically relevant freezing limit.
-    "nuc_ih":       dict(color="#22c55e", dash="solid", width=2),
-    "nuc_iii":      dict(color="#9ca3af", dash="dash", width=1.5),
-    "kauzmann":     dict(color="#22c55e", dash="solid", width=2),
-}
-
-_PD_LABELS = {
-    'binodal':      'Binodal',
-    'hdl_spinodal': 'HDL Spinodal',
-    'ldl_spinodal': 'LDL Spinodal',
-    'tmd':          'TMD (max density)',
-    'widom':        'Widom line',
-    'ice_ih':       'Ice Ih liquidus',
-    'ice_iii':      'Ice III liquidus',
-    'nuc_ih':       'Homogeneous nucleation (Ih)',
-    'nuc_iii':      'Homogeneous nucleation (III)',
-    'kauzmann':     'Kauzmann temperature',
-    'LLCP':         'LLCP',
-}
-
-# Maps show-key to actual dict key in compute_phase_diagram_data return value
-_PD_KEYMAP = {
-    "ice_ih": "ice_ih_liquidus",
-    "ice_iii": "ice_iii_liquidus",
-    "nuc_ih": "nucleation_ih",
-    "nuc_iii": "nucleation_iii",
-}
-
-
 def build_eos_phase_figure(*, model, show, theme,
                            T_range=None, P_range=None, auto_limits=True):
-    pd = compute_phase_diagram_data(model)
-    fig = go.Figure()
+    """EoS phase diagram of a two-state model (watereos.eos_phase_diagram).
 
-    for key in show:
-        if key == "LLCP":
-            llcp = pd.get("LLCP") or {}
-            if llcp.get("T_K") is not None:
-                fig.add_trace(go.Scatter(
-                    x=[float(llcp["T_K"])], y=[float(llcp["p_MPa"])],
-                    mode="markers", name="LLCP",
-                    marker=dict(color="#9333ea", size=12,
-                                line=dict(width=1, color="white"))))
-            continue
-
-        data_key = _PD_KEYMAP.get(key, key)
-        d = pd.get(data_key) or {}
-        st = _PD_STYLES.get(key, dict(color="#888", dash="solid", width=2))
-
-        # binodal uses {T_binodal, p_array} from compute_phase_diagram_data;
-        # the Dash callback silently skipped this curve because it checked
-        # for T_K/p_MPa which are absent here. The API renders it correctly.
-        if key == "binodal":
-            T_vals = d.get("T_binodal")
-            P_vals = d.get("p_array")
-        else:
-            T_vals = d.get("T_K")
-            P_vals = d.get("p_MPa")
-
-        if T_vals is None or P_vals is None:
-            continue
-
-        fig.add_trace(go.Scatter(
-            x=list(T_vals), y=list(P_vals), mode="lines", name=_PD_LABELS.get(key, key),
-            line=dict(color=st["color"], dash=st["dash"], width=st["width"])))
-
-    # Triple point marker (shown alongside ice_iii)
-    tp = pd.get("triple_point") or {}
-    if tp.get("T_K") is not None and ("ice_ih" in show or "ice_iii" in show):
-        fig.add_trace(go.Scatter(
-            x=[float(tp["T_K"])], y=[float(tp["p_MPa"])], mode="markers",
-            name="Triple point",
-            marker=dict(color="#166534", size=12, symbol="square",
-                        line=dict(width=1, color="white"))))
-
-    # Self-titled so the React UI can render the chart card "bare" (no
-    # outer card title) without losing context. Falls back to the bare key
-    # if a registry entry is missing (e.g. an unfamiliar model).
-    try:
-        _display = MODEL_REGISTRY[model].display_name
-    except KeyError:
-        _display = model
-    fig.update_layout(
-        title=dict(text=f"{_display} — EoS Phase Diagram"),
-        xaxis_title="Temperature [K]",
-        yaxis_title="Pressure [MPa]",
-    )
-    apply_theme(fig, theme)
-    if not auto_limits:
-        if T_range is not None:
-            fig.update_xaxes(range=list(T_range))
-        if P_range is not None:
-            fig.update_yaxes(range=list(P_range))
-    return fig
+    With auto_limits the figure keeps the diagram's standard window,
+    100-375 K and -400 to 420 MPa; otherwise T_range and P_range apply.
+    """
+    return plot_eos_phase_diagram(
+        model, show=show, theme=theme,
+        T_range=None if auto_limits else T_range,
+        P_range=None if auto_limits else P_range)
 
 
 # ---------------------------------------------------------------------------
