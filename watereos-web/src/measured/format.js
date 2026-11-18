@@ -16,6 +16,8 @@ export const UNIT_PRETTY = {
   1: 'fraction',
   'm2/s': 'm²/s',
   'Pa s': 'Pa·s',
+  GHz: 'GHz',
+  's2/m': 's²/m',
 };
 
 export const unitPretty = (u) => UNIT_PRETTY[u] ?? u ?? '';

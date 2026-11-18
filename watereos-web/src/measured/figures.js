@@ -204,6 +204,7 @@ export const COLOR_MODES = [
   { value: 'sample', label: 'Sample' },
   { value: 'substance', label: 'Substance' },
   { value: 'qc_flag', label: 'QC flag' },
+  { value: 'method', label: 'Method' },
   { value: 'ice_phase', label: 'Ice phase' },
   { value: 'fits', label: 'Used in fits' },
   { value: 'year', label: 'Year' },

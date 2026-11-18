@@ -59,7 +59,8 @@ Every table and every source of the database, with these changes made by the loa
 * Added: `u_std` (absolute standard uncertainty, k = 1, as `fitting_data/scripts/fdata.py` computes it), the rate in
   K/min, the publication year, and a release record.
 
-The views hide D2O and the `quoted` and `correlation` rows by default; the filters bring them back. Kinetic, dynamics
+The views hide D2O and the `quoted` and `correlation` rows by default; the filters bring them back. Filters cover substance, data type, extraction, state, sample, QC flag, measurement method, the fits a row
+was used in, publication year and source. Kinetic, dynamics
 and structure tables carry a "not thermodynamic data" banner.
 
 The site and the download carry this notice (`schema.NOTICE`): the values come from the cited published studies;
