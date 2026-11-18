@@ -281,30 +281,55 @@ def _solve_x_stable(DG, Th, om, ph):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. Finite-difference helpers for temperature derivatives of state A
+# 8. Temperature derivative of the state-A entropy
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _state_A_at(ph, Th):
-    """Evaluate VA and SA at a given (ph, Th). Returns (VA, SA)."""
-    pS, VS, phi, dpS, dVS, dphi = spinodal_props(Th)
-    B, dB = compute_B(pS, VS, phi, dpS, dVS, dphi)
-    VA, _, _ = compute_VA(ph, pS, VS, B)
-    SA = compute_SA(VA, VS, Th, dpS, B, dB, pS, dVS, dphi)
-    return VA, SA
+_STEP = 1e-20
 
 
-def _dVA_dTh(ph, Th, delta=1e-7):
-    """Central finite difference for dVA/dTh at constant ph."""
-    VA_p, _ = _state_A_at(ph, Th + delta)
-    VA_m, _ = _state_A_at(ph, Th - delta)
-    return (VA_p - VA_m) / (2.0 * delta)
+def _dSA_dTh(ph, Th):
+    """dSA/dTh at constant ph, exact to rounding.
 
+    Evaluates SA (Eq. 20, as in compute_batch) at the complex temperature
+    Th + i*h with h = 1e-20 and returns Im(SA)/h. Unlike a finite
+    difference, the derivative carries no subtractive cancellation and no
+    truncation error. The Rust core (src/duska.rs:dsa_dth) takes the same
+    derivative on dual numbers. Every operation is analytic in Th; the
+    sign of the radicand of B and the guards on u and VA/VS are decided on
+    the real parts. NaN below the liquid-vapor spinodal, like VA.
+    """
+    Th = np.asarray(Th, dtype=float) + 1j * _STEP
+    dTh = Th - 1.0
 
-def _dSA_dTh(ph, Th, delta=1e-7):
-    """Central finite difference for dSA/dTh at constant ph."""
-    _, SA_p = _state_A_at(ph, Th + delta)
-    _, SA_m = _state_A_at(ph, Th - delta)
-    return (SA_p - SA_m) / (2.0 * delta)
+    pS = 1.0 + P.d[0]*dTh + P.d[1]*dTh**2 + P.d[2]*dTh**3
+    dpS = P.d[0] + 2*P.d[1]*dTh + 3*P.d[2]*dTh**2
+    VS = P.c[0] + P.c[1]*Th + P.c[2]*Th**2 + P.c[3]*Th**3 + P.c[4]*Th**4
+    dVS = P.c[1] + 2*P.c[2]*Th + 3*P.c[3]*Th**2 + 4*P.c[4]*Th**3
+    phi = P.b[0] + P.b[1]*Th + P.b[2]*Th**2 + P.b[3]*Th**3 + P.b[4]*Th**4
+    dphi = P.b[1] + 2*P.b[2]*Th + 3*P.b[3]*Th**2 + 4*P.b[4]*Th**3
+
+    arg = -phi / (2.0 * pS * VS**2)
+    B = np.sqrt(np.where(arg.real >= 0.0, arg, -arg))       # sqrt(|arg|)
+    num_B = (-dphi * pS * VS**2 + phi * dpS * VS**2
+             + 2.0 * phi * pS * VS * dVS)
+    darg = num_B / (2.0 * pS**2 * VS**4)
+    dB = np.where(B.real > 0, darg / (2.0 * B), 0.0)
+
+    with np.errstate(invalid='ignore', divide='ignore'):
+        arg_u = 1.0 - ph / pS
+        u = np.sqrt(np.where(arg_u.real >= 0.0, arg_u, np.nan))
+        VA = VS * B / (u + B)
+
+        A_coeff = dpS * B**2 + 2.0 * pS * B * dB
+        C_coeff = 2.0 * pS * B**2 * dVS
+        SS = (P.s[0] * np.log(np.where(Th.real > 0.0, Th, np.nan)) + P.s[1]*Th
+              + P.s[2]/2.0*Th**2 + P.s[3]/3.0*Th**3)
+        r = VA / VS
+        ln_r = np.log(np.where(r.real > 1e-300, r, 1e-300))
+        SA = (dpS * (VA - VS)
+              + A_coeff * (VS**2/VA + 2.0*VS*ln_r - VA)
+              + C_coeff * (VS/VA + ln_r - 1.0) + SS)
+    return SA.imag / _STEP
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -537,11 +562,8 @@ def compute_properties(T_K, p_MPa, _compute_Kp=False):
     dVh_dT_x = dVA_dTh_val + x * d2DG_dpT + P.w[0] * P.w[3] * x * (1.0 - x)
     dVh_dT = dVh_dT_x + dVhdx * dx_dTh
 
-    # ── dSA/dTh via finite difference (computed once, reused below) ──────
-    delta = 1e-7
-    _, SA_p = _state_A_at(ph, Th + delta)
-    _, SA_m = _state_A_at(ph, Th - delta)
-    dSA_dTh_val = (SA_p - SA_m) / (2.0 * delta)
+    # ── dSA/dTh (complex step, section 8; reused below) ─────────────────
+    dSA_dTh_val = float(_dSA_dTh(ph, Th))
 
     # ── dSh/dTh at fixed x (Eq. 42) ─────────────────────────────────────
     dSh_dT_x = dSA_dTh_val - x * d2DG_dT2  # d2omega/dT2 = 0
@@ -665,11 +687,8 @@ def compute_properties_at_x(T_K, p_MPa, x, _compute_Kp=False):
     dVh_dT_x = dVA_dTh_val + x * d2DG_dpT + P.w[0] * P.w[3] * x * (1.0 - x)
     dVh_dT = dVh_dT_x + dVhdx * dx_dTh
 
-    # dSA/dTh via finite difference
-    delta = 1e-7
-    _, SA_p = _state_A_at(ph, Th + delta)
-    _, SA_m = _state_A_at(ph, Th - delta)
-    dSA_dTh_val = (SA_p - SA_m) / (2.0 * delta)
+    # dSA/dTh (complex step, section 8)
+    dSA_dTh_val = float(_dSA_dTh(ph, Th))
 
     # dSh/dTh
     dSh_dT_x = dSA_dTh_val - x * d2DG_dT2
@@ -754,49 +773,6 @@ def _solve_x_vec_duska(DG, Th, om):
         return xc * DG + Th * me + om * xc * (1.0 - xc)
 
     return np.where(_g_vec(x_lo) <= _g_vec(x_hi), x_lo, x_hi)
-
-
-def _SA_vec(ph, Th):
-    """
-    Vectorized evaluation of state-A entropy SA at arbitrary (ph, Th) arrays.
-
-    Used for finite-difference dSA/dTh. Returns 1-D array of SA values.
-    """
-    dTh = Th - 1.0
-
-    # Spinodal polynomials
-    pS = 1.0 + P.d[0]*dTh + P.d[1]*dTh**2 + P.d[2]*dTh**3
-    dpS = P.d[0] + 2*P.d[1]*dTh + 3*P.d[2]*dTh**2
-    VS = P.c[0] + P.c[1]*Th + P.c[2]*Th**2 + P.c[3]*Th**3 + P.c[4]*Th**4
-    dVS = P.c[1] + 2*P.c[2]*Th + 3*P.c[3]*Th**2 + 4*P.c[4]*Th**3
-    phi = P.b[0] + P.b[1]*Th + P.b[2]*Th**2 + P.b[3]*Th**3 + P.b[4]*Th**4
-    dphi = P.b[1] + 2*P.b[2]*Th + 3*P.b[3]*Th**2 + 4*P.b[4]*Th**3
-
-    # B parameter
-    arg = -phi / (2.0 * pS * VS**2)
-    B = np.sqrt(np.abs(arg))
-    num_B = (-dphi * pS * VS**2 + phi * dpS * VS**2
-             + 2.0 * phi * pS * VS * dVS)
-    denom_B = 2.0 * pS**2 * VS**4
-    darg = num_B / denom_B
-    dB = np.where(B > 0, darg / (2.0 * B), 0.0)
-
-    # State A volume
-    u = np.sqrt(np.maximum(1.0 - ph / pS, 0.0))
-    denom_VA = u + B
-    VA = VS * B / denom_VA
-
-    # Entropy coefficients
-    A_coeff = dpS * B**2 + 2.0 * pS * B * dB
-    C_coeff = 2.0 * pS * B**2 * dVS
-    SS = (P.s[0] * np.log(Th) + P.s[1]*Th
-          + P.s[2]/2.0*Th**2 + P.s[3]/3.0*Th**3)
-    r = VA / VS
-    ln_r = np.log(np.maximum(r, 1e-300))
-    SA = (dpS * (VA - VS)
-          + A_coeff * (VS**2/VA + 2.0*VS*ln_r - VA)
-          + C_coeff * (VS/VA + ln_r - 1.0) + SS)
-    return SA
 
 
 def compute_batch(T_K, p_MPa, branch='stable'):
@@ -925,11 +901,8 @@ def compute_batch(T_K, p_MPa, branch='stable'):
     dVh_dT_x = dVA_dTh + x * d2DG_dpT + P.w[0] * P.w[3] * x * (1.0 - x)
     dVh_dT = dVh_dT_x + dVhdx * dx_dTh
 
-    # ── (l) dSA/dTh via finite difference ───────────────────────────────
-    delta = 1e-7
-    SA_p = _SA_vec(ph, Th + delta)
-    SA_m = _SA_vec(ph, Th - delta)
-    dSA_dTh = (SA_p - SA_m) / (2.0 * delta)
+    # ── (l) dSA/dTh (complex step, section 8) ───────────────────────────
+    dSA_dTh = _dSA_dTh(ph, Th)
 
     # ── (m) dSh/dTh ─────────────────────────────────────────────────────
     dSh_dT_x = dSA_dTh - x * d2DG_dT2

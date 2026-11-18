@@ -1,8 +1,8 @@
 //! Duška (2020) EOS-VaT two-state EoS — Rust implementation.
 //!
 //! Direct port of `duska_eos/core.py:compute_batch` with per-point loop
-//! fusion, the closed-form Gibbs energy of state A, and finite-difference
-//! dSA/dTh.
+//! fusion, the closed-form Gibbs energy of state A, and dSA/dTh evaluated
+//! exactly on dual numbers.
 
 use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::branch::{mask_mixture, select_branch, Branch};
+use crate::dual::Dual;
 use crate::par::map_indexed;
 
 /// Smallest task handed to the thread pool (see par.rs). A point costs
@@ -144,14 +145,48 @@ fn compute_sa(va: f64, vs: f64, th: f64, dps: f64, b: f64, db: f64,
         + ss
 }
 
-/// Evaluate VA and SA at given (ph, th) — used for finite-difference dSA/dTh.
-#[inline(always)]
-fn state_a_at(ph: f64, th: f64) -> (f64, f64) {
-    let (ps, vs, phi, dps, dvs, dphi) = spinodal_props(th);
-    let (b, db) = compute_b(ps, vs, phi, dps, dvs, dphi);
-    let (va, _, _) = compute_va(ph, ps, vs, b);
-    let sa = compute_sa(va, vs, th, dps, b, db, ps, dvs, dphi);
-    (va, sa)
+/// dSA/dTh at constant ph, exact to rounding: SA (Eq. 20) evaluated on a
+/// dual number in Th. Mirrors `duska_eos/core.py:_dSA_dTh`, which takes the
+/// same derivative by a complex step. NaN below the liquid-vapor spinodal.
+#[inline]
+fn dsa_dth(ph: f64, th: f64) -> f64 {
+    let th = Dual::<1>::var(th, 0);
+    let dth = th - 1.0;
+    let (dth2, th2) = (dth.square(), th.square());
+    let (dth3, th3, th4) = (dth * dth2, th * th2, th2.square());
+
+    let ps = 1.0 + D_PS[0] * dth + D_PS[1] * dth2 + D_PS[2] * dth3;
+    let dps = D_PS[0] + 2.0 * D_PS[1] * dth + 3.0 * D_PS[2] * dth2;
+    let vs = C_VS[0] + C_VS[1] * th + C_VS[2] * th2 + C_VS[3] * th3 + C_VS[4] * th4;
+    let dvs = C_VS[1] + 2.0 * C_VS[2] * th + 3.0 * C_VS[3] * th2 + 4.0 * C_VS[4] * th3;
+    let phi = B_PHI[0] + B_PHI[1] * th + B_PHI[2] * th2 + B_PHI[3] * th3 + B_PHI[4] * th4;
+    let dphi = B_PHI[1] + 2.0 * B_PHI[2] * th + 3.0 * B_PHI[3] * th2 + 4.0 * B_PHI[4] * th3;
+
+    let vs2 = vs.square();
+    let arg = -phi / (2.0 * ps * vs2);
+    let b = (if arg.v >= 0.0 { arg } else { -arg }).sqrt(); // sqrt(|arg|)
+    let num = -dphi * ps * vs2 + phi * dps * vs2 + 2.0 * phi * ps * vs * dvs;
+    let darg = num / (2.0 * ps.square() * vs2.square());
+    let db = if b.v > 0.0 { darg / (2.0 * b) } else { Dual::cst(0.0) };
+
+    let u_arg = 1.0 - ph / ps;
+    if !(u_arg.v >= 0.0 && th.v > 0.0) {
+        return f64::NAN;
+    }
+    let u = u_arg.sqrt();
+    let va = vs * b / (u + b);
+
+    let b2 = b.square();
+    let a_coeff = dps * b2 + 2.0 * ps * b * db;
+    let c_coeff = 2.0 * ps * b2 * dvs;
+    let ss = S_ENT[0] * th.ln() + S_ENT[1] * th + S_ENT[2] / 2.0 * th2 + S_ENT[3] / 3.0 * th3;
+    let r = va / vs;
+    let ln_r = (if r.v > 1e-300 { r } else { Dual::cst(1e-300) }).ln();
+    let sa = dps * (va - vs)
+        + a_coeff * (vs2 / va + 2.0 * vs * ln_r - va)
+        + c_coeff * (vs / va + ln_r - 1.0)
+        + ss;
+    sa.d[0]
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -395,11 +430,8 @@ fn compute_point(t_k: f64, p_mpa: f64, branch: Branch) -> PointResult {
     let dvh_dt_x = dva_dth + x * d2dg_dpdt + W_OM[0] * W_OM[3] * x * (1.0 - x);
     let dvh_dt = dvh_dt_x + dvhdx * dx_dth;
 
-    // ── dSA/dTh via central finite difference ────────────────────────
-    let delta = 1e-7;
-    let (_, sa_p) = state_a_at(ph, th + delta);
-    let (_, sa_m) = state_a_at(ph, th - delta);
-    let dsa_dth = (sa_p - sa_m) / (2.0 * delta);
+    // ── dSA/dTh, exact (dual numbers) ────────────────────────────────
+    let dsa_dth = dsa_dth(ph, th);
 
     // ── dSh/dTh ──────────────────────────────────────────────────────
     let dsh_dt_x = dsa_dth - x * d2dg_dt2;

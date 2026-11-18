@@ -9,15 +9,15 @@
 //!
 //! The NumPy core takes the second derivatives of the high-density state
 //! by a complex step through its analytic first derivatives. Here the same
-//! first derivatives are evaluated on dual numbers carrying d/dT and d/dp,
-//! which is the same derivative without the step; both are free of
-//! subtractive cancellation, so the backends agree to rounding.
+//! first derivatives are evaluated on dual numbers carrying d/dT and d/dp
+//! (dual.rs), which is the same derivative without the step; both are free
+//! of subtractive cancellation, so the backends agree to rounding.
 //!
 //! Pure-state Gibbs derivatives are molar (J/mol, K, MPa). The returned
 //! properties use the specific SI units of watereos, with bulk moduli in
 //! MPa.
 
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
@@ -25,6 +25,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::branch::{select_branch, Branch};
+use crate::dual::Dual;
 use crate::par::map_indexed;
 
 /// Smallest task handed to the thread pool (see par.rs). A point costs
@@ -143,188 +144,9 @@ const IVP: [f64; 5] = [
     VS[2] * PS_T[1] / 4.0,
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Dual numbers carrying d/dT and d/dp
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[derive(Clone, Copy, Debug)]
-struct Dual {
-    v: f64,
-    t: f64,
-    p: f64,
-}
-
-impl Dual {
-    #[inline(always)]
-    const fn cst(v: f64) -> Dual {
-        Dual { v, t: 0.0, p: 0.0 }
-    }
-
-    /// f(self), given f and f' at self.v.
-    #[inline(always)]
-    fn chain(self, f: f64, df: f64) -> Dual {
-        Dual { v: f, t: df * self.t, p: df * self.p }
-    }
-
-    #[inline(always)]
-    fn sqrt(self) -> Dual {
-        let s = self.v.sqrt();
-        self.chain(s, 0.5 / s)
-    }
-
-    #[inline(always)]
-    fn ln(self) -> Dual {
-        self.chain(self.v.ln(), 1.0 / self.v)
-    }
-
-    #[inline(always)]
-    fn ln_1p(self) -> Dual {
-        self.chain(self.v.ln_1p(), 1.0 / (1.0 + self.v))
-    }
-
-    #[inline(always)]
-    fn exp(self) -> Dual {
-        let e = self.v.exp();
-        self.chain(e, e)
-    }
-
-    #[inline(always)]
-    fn exp_m1(self) -> Dual {
-        self.chain(self.v.exp_m1(), self.v.exp())
-    }
-
-    /// x^(1/4) as exp(log(x) / 4), the complex power NumPy evaluates.
-    #[inline(always)]
-    fn quarter_power(self) -> Dual {
-        let r = (0.25 * self.v.ln()).exp();
-        self.chain(r, 0.25 * r / self.v)
-    }
-
-    #[inline(always)]
-    fn square(self) -> Dual {
-        self * self
-    }
-
-    #[inline(always)]
-    fn recip(self) -> Dual {
-        Dual::cst(1.0) / self
-    }
-}
-
-impl Add for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn add(self, o: Dual) -> Dual {
-        Dual { v: self.v + o.v, t: self.t + o.t, p: self.p + o.p }
-    }
-}
-
-impl Sub for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn sub(self, o: Dual) -> Dual {
-        Dual { v: self.v - o.v, t: self.t - o.t, p: self.p - o.p }
-    }
-}
-
-impl Mul for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn mul(self, o: Dual) -> Dual {
-        Dual {
-            v: self.v * o.v,
-            t: self.v * o.t + self.t * o.v,
-            p: self.v * o.p + self.p * o.v,
-        }
-    }
-}
-
-impl Div for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn div(self, o: Dual) -> Dual {
-        let v = self.v / o.v;
-        Dual { v, t: (self.t - v * o.t) / o.v, p: (self.p - v * o.p) / o.v }
-    }
-}
-
-impl Neg for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn neg(self) -> Dual {
-        Dual { v: -self.v, t: -self.t, p: -self.p }
-    }
-}
-
-impl Add<f64> for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn add(self, o: f64) -> Dual {
-        Dual { v: self.v + o, ..self }
-    }
-}
-
-impl Sub<f64> for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn sub(self, o: f64) -> Dual {
-        Dual { v: self.v - o, ..self }
-    }
-}
-
-impl Mul<f64> for Dual {
-    type Output = Dual;
-    #[inline(always)]
-    fn mul(self, o: f64) -> Dual {
-        Dual { v: self.v * o, t: self.t * o, p: self.p * o }
-    }
-}
-
-impl Div<f64> for Dual {
-    type Output = Dual;
-    /// Multiplication by the reciprocal, as NumPy divides a complex array
-    /// by a real number.
-    #[inline(always)]
-    fn div(self, o: f64) -> Dual {
-        self * (1.0 / o)
-    }
-}
-
-impl Add<Dual> for f64 {
-    type Output = Dual;
-    #[inline(always)]
-    fn add(self, o: Dual) -> Dual {
-        Dual { v: self + o.v, ..o }
-    }
-}
-
-impl Sub<Dual> for f64 {
-    type Output = Dual;
-    #[inline(always)]
-    fn sub(self, o: Dual) -> Dual {
-        Dual { v: self - o.v, t: -o.t, p: -o.p }
-    }
-}
-
-impl Mul<Dual> for f64 {
-    type Output = Dual;
-    #[inline(always)]
-    fn mul(self, o: Dual) -> Dual {
-        Dual { v: self * o.v, t: self * o.t, p: self * o.p }
-    }
-}
-
-impl Div<Dual> for f64 {
-    type Output = Dual;
-    #[inline(always)]
-    fn div(self, o: Dual) -> Dual {
-        Dual::cst(self) / o
-    }
-}
-
 /// Power series c[0] + c[1] t + ... by Horner's rule.
 #[inline(always)]
-fn poly<const N: usize>(c: &[f64; N], t: Dual) -> Dual {
+fn poly<const N: usize, const M: usize>(c: &[f64; N], t: Dual<M>) -> Dual<M> {
     let mut r = Dual::cst(c[N - 1]);
     for k in (0..N - 1).rev() {
         r = r * t + c[k];
@@ -493,7 +315,7 @@ fn ice(t: f64, p: f64) -> [f64; 6] {
 /// Einstein oscillator of characteristic temperature `theta`:
 /// (A, dA/dT, d2A/dT2) per mole of oscillators.
 #[inline(always)]
-fn oscillator(t: Dual, theta: f64) -> (Dual, Dual, Dual) {
+fn oscillator<const N: usize>(t: Dual<N>, theta: f64) -> (Dual<N>, Dual<N>, Dual<N>) {
     let u = theta / t;
     let log_partition = (-(-u).exp_m1()).ln();
     let population = u.exp_m1().recip();
@@ -507,7 +329,7 @@ fn oscillator(t: Dual, theta: f64) -> (Dual, Dual, Dual) {
 #[inline]
 fn low(t: f64, p: f64) -> [f64; 6] {
     let [g, gt, gp, gtt, gtp, gpp] = ice(t, p);
-    let (a, at, att) = oscillator(Dual::cst(t), TH_L);
+    let (a, at, att) = oscillator(Dual::<0>::cst(t), TH_L);
     [
         g + H_L - t * S_L + N_L * a.v + p * (V_L - 0.5 * K_L * p),
         gt - S_L + N_L * at.v,
@@ -521,10 +343,10 @@ fn low(t: f64, p: f64) -> [f64; 6] {
 /// High-density state: G, G_T and G_p, each with its T and p derivatives.
 /// NaN beyond the liquid-vapor spinodal of the state.
 #[inline]
-fn high(t: f64, p: f64) -> [Dual; 3] {
-    const NAN: Dual = Dual { v: f64::NAN, t: f64::NAN, p: f64::NAN };
-    let tk = Dual { v: t, t: 1.0, p: 0.0 };
-    let pm = Dual { v: p, t: 0.0, p: 1.0 };
+fn high(t: f64, p: f64) -> [Dual<2>; 3] {
+    const NAN: Dual<2> = Dual { v: f64::NAN, d: [f64::NAN; 2] };
+    let tk = Dual::<2>::var(t, 0);
+    let pm = Dual::<2>::var(p, 1);
 
     let t2 = tk * tk;
     let teff = (t2 * t2 + 100.0_f64.powi(4)).quarter_power();
@@ -662,7 +484,7 @@ fn compute_point(t: f64, p: f64, branch: Branch) -> PointResult {
         return missing;
     }
     let [hg, hgt, hgp] = high(t, p);
-    let hi = [hg.v, hgt.v, hgp.v, hgt.t, hgp.t, hgp.p];
+    let hi = [hg.v, hgt.v, hgp.v, hgt.d[0], hgp.d[0], hgp.d[1]];
     let lo = low(t, p);
     if !(hi[0].is_finite() && lo[0].is_finite()) {
         return missing;

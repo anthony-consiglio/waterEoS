@@ -4,6 +4,7 @@
 use pyo3::prelude::*;
 
 mod branch;
+mod dual;
 mod par;
 mod caupin;
 mod holten;

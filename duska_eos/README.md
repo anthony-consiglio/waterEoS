@@ -174,8 +174,8 @@ State A and state B properties are also available with `_A` and `_B` suffixes.
 ## Implementation Notes
 
 - **`params.py`** — All 28 parameters with corrections for coefficient ordering (confirmed against the author's MATLAB implementation).
-- **`core.py`** — Scalar (`compute_properties`) and vectorized (`compute_batch`) computation. Uses finite-difference for `dS_A/dT_hat` and the closed form above for `G_A`.
-- **`core_ad.py`** — JAX-based autodiff version (avoids finite differences entirely).
+- **`core.py`** — Scalar (`compute_properties`) and vectorized (`compute_batch`) computation. Takes `dS_A/dT_hat` exactly by a complex step and uses the closed form above for `G_A`. The Rust backend (`src/duska.rs`) takes the same derivative on dual numbers.
+- **`core_ad.py`** — JAX-based autodiff version.
 - **`phase_diagram.py`** — Spinodal and binodal curves.
 - **Reference state:** Aligned to IAPWS-95 at T = 273.15 K, P = 0.1 MPa.
 - **Mixing and reference point:** Volume-additive mixing of the two states; reduced variables are referenced to the vapor-liquid critical point (647 K, 22 MPa), with the liquid-liquid critical point emerging as a prediction.
