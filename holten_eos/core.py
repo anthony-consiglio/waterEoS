@@ -12,7 +12,7 @@ Dual reduced variables:
 The main entry point is compute_properties(T_K, p_MPa).
 
 Reference: V. Holten, J. V. Sengers, M. A. Anisimov,
-           J. Phys. Chem. Ref. Data 43, 014101 (2014).
+           J. Phys. Chem. Ref. Data 43, 043101 (2014).
 """
 
 import math

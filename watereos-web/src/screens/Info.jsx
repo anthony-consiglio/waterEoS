@@ -5,77 +5,48 @@ import { PlotCard } from '../components/PlotCard.jsx';
 const CONCEPTS = [
   {
     t: 'Two-state model',
-    b: 'Water is treated as a mixture of HDL (state A, disordered) and LDL (state B, tetrahedral). The fraction x ∈ [0, 1] gives the LDL share.',
+    b: 'Liquid water is treated as a mixture of a high-density (HDL) and a low-density (LDL) local structure. The fraction x ∈ [0, 1] is the LDL share.',
     m: 'x',
   },
   {
-    t: 'LLCP',
-    b: 'The liquid-liquid critical point at the top of the HDL/LDL coexistence dome — predicted but not yet experimentally observed.',
+    t: 'Liquid–liquid critical point',
+    b: 'The end of the HDL/LDL coexistence line, predicted by the two-state models but not yet confirmed experimentally.',
     m: 'Tc, Pc',
   },
   {
-    t: 'Spinodal',
-    b: 'The stability limit in (T, P) space where compressibility diverges. Each two-state model has both an HDL and LDL spinodal.',
-    m: '∂P/∂V = 0',
+    t: 'Coexistence line',
+    b: 'Where HDL and LDL have equal Gibbs energy. Below about 150 K some models’ lines are reentrant and turn back toward lower pressure.',
+    m: 'G_HDL = G_LDL',
   },
   {
-    t: 'Binodal',
-    b: 'The liquid-liquid coexistence curve: (T, P) where HDL and LDL have equal Gibbs energy, lying between the two spinodals.',
-    m: 'GA = GB',
+    t: 'Stability limits',
+    b: 'Beyond its stability limit (spinodal) the metastable liquid ceases to exist. The HDL and LDL limits meet at the critical point.',
+    m: '∂²G/∂x² = 0',
   },
   {
     t: 'Widom line',
-    b: 'A line of maximum correlation length emanating from the LLCP — traced as the locus of isobaric Cp maxima.',
-    m: 'max(Cp)',
+    b: 'The continuation of the coexistence line above the critical point, where the two structures are equally abundant. Response functions peak near it.',
+    m: 'x = 1/2',
   },
   {
-    t: 'TMD',
-    b: 'Temperature of maximum density: where ρ peaks at a given P, equivalently where thermal expansivity α crosses zero.',
+    t: 'Density maximum',
+    b: 'The temperature of maximum density (TMD) along each isobar, where the thermal expansivity α changes sign: 277.13 K at 1 atm.',
     m: 'α = 0',
   },
-];
-
-// References for the EoS models. Each entry mirrors the citation block at
-// the top of the corresponding source file in the Python package. The
-// H2O phase-diagram data provenance is described separately by
-// SEAFREEZE_NOTE below.
-const REFERENCES = [
   {
-    group: 'Equation-of-state models',
-    items: [
-      {
-        key: 'holten2014',
-        text: 'V. Holten, J. V. Sengers, and M. A. Anisimov. "Equation of state for supercooled water at pressures up to 400 MPa." J. Phys. Chem. Ref. Data 43, 014101 (2014).',
-      },
-      {
-        key: 'caupin2019',
-        text: 'F. Caupin and M. A. Anisimov. "Thermodynamics of supercooled and stretched water: Unifying two-structure description and liquid-vapor spinodal." J. Chem. Phys. 151, 034503 (2019). Erratum: J. Chem. Phys. 163, 039902 (2025). The \'caupin2019_kim\' variant additionally incorporates the X-ray κ_T data of K. H. Kim et al., Science 358, 1589 (2017).',
-      },
-      {
-        key: 'duska2020',
-        text: 'M. Duška. "Water above the spinodal." J. Chem. Phys. 152, 174501 (2020).',
-      },
-      {
-        key: 'shi_tanaka2020',
-        text: 'R. Shi and H. Tanaka. "The anomalies and criticality of liquid water." Proc. Natl. Acad. Sci. 117, 26591–26599 (2020). Provides both the hierarchical two-state thermodynamic EoS (\'shi_tanaka2020\') and a coupled transport model (\'shi_tanaka2020_transport\') for viscosity, self-diffusion, and rotational relaxation.',
-      },
-      {
-        key: 'grenke2025',
-        text: 'L. M. Grenke and J. A. W. Elliott. "A new Tait-Tammann equation of state for liquid water." J. Phys. Chem. B 129, 1997–2012 (2025). Correction: J. Phys. Chem. B 129, 9850–9853 (2025).',
-      },
-      {
-        key: 'singh2017',
-        text: 'L. P. Singh, B. Issenmann, and F. Caupin. "Pressure dependence of viscosity in supercooled water and a unified approach for thermodynamic and dynamic anomalies of water." Proc. Natl. Acad. Sci. 114, 4312–4317 (2017).',
-      },
-      {
-        key: 'IAPWS95',
-        text: 'W. Wagner and A. Pruß. "The IAPWS formulation 1995 for the thermodynamic properties of ordinary water substance for general and scientific use." J. Phys. Chem. Ref. Data 31, 387–535 (2002).',
-      },
-      {
-        key: 'water1',
-        text: 'B. Journaux et al. "Holistic approach for studying planetary hydrospheres: Gibbs representations, ices thermodynamics, transport, and the example of Europa." J. Geophys. Res.: Planets 125, e2019JE006176 (2020). (Source of the SeaFreeze GLBF splines used for "water1" and the ice phases.)',
-      },
-    ],
+    t: 'Response extrema',
+    b: 'Lines where compressibility and sound speed peak or dip along isobars, and heat capacity along isotherms. Solid lines are maxima, dashed lines minima.',
+    m: 'max / min',
+  },
+  {
+    t: 'Liquid–vapor spinodal',
+    b: 'The largest tension the liquid can bear before it becomes mechanically unstable and cavitates. It bounds stretched (negative-pressure) water; Caupin (2019) and Duška (2020) include it.',
+    m: '(∂P/∂V)_T = 0',
+  },
+  {
+    t: 'Homogeneous nucleation',
+    b: 'Below this line ice nucleates spontaneously in small samples, so bulk-liquid data are scarce and the models are extrapolated (Holten et al. 2014, App. A).',
+    m: 'T_H',
   },
 ];
 
@@ -84,40 +55,38 @@ const REFERENCES = [
 // because it's a data-provenance note, not a paper reference.
 const SEAFREEZE_NOTE = (
   <>
-    The thermodynamic data driving the <code>water1</code> liquid model and
-    every ice phase in the H₂O Phase Diagram tab (Ice Ih, II, III, V, VI, and
-    the French–Redmer Ice VII/X parametrization) is taken from the{' '}
-    <a
-      href="https://github.com/Bjournaux/SeaFreeze"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
+    The thermodynamic data driving the <code>water1</code> liquid model and every ice phase in the
+    H₂O Phase Diagram tab (Ice Ih, II, III, V, VI, and the French–Redmer Ice VII/X parametrization)
+    is taken from the{' '}
+    <a href="https://github.com/Bjournaux/SeaFreeze" target="_blank" rel="noopener noreferrer">
       SeaFreeze
     </a>{' '}
     project.
   </>
 );
 
-// Default hero diagram — Duska 2020 with every available overlay, on a fixed
-// T = 180-280 K, P = 0-200 MPa window so the LLCP, both spinodals, ice
-// liquidus, nucleation and Kauzmann lines all sit in frame.
+// Hero diagram: Caupin & Anisimov (2019) in the EoS Phase Diagram tab's style
+// and standard window (100-375 K, -400 to 420 MPa), model curves only.
 const HERO_PARAMS = {
-  model: 'duska2020',
+  model: 'caupin2019',
   show: [
     'binodal',
+    'LLCP',
     'hdl_spinodal',
     'ldl_spinodal',
-    'LLCP',
-    'tmd',
     'widom',
+    'lv_spinodal',
+    'vapor_liquid',
+    'nucleation',
     'ice_ih',
     'ice_iii',
-    'nuc_ih',
-    'nuc_iii',
+    'ice_v',
+    'density',
+    'compressibility',
+    'sound_speed',
+    'heat_capacity',
   ],
-  auto_limits: false,
-  T_range: [180, 280],
-  P_range: [0, 200],
+  auto_limits: true,
 };
 
 // Drawing order in Plotly is array order — later traces sit on top. Lift any
@@ -135,8 +104,31 @@ function _liftBinodalToTop(data) {
   return [...front, ...top];
 }
 
+// A DOI as a link; with children, the children are the link text.
+function DoiLink({ doi, children }) {
+  if (!doi) return children ?? null;
+  return (
+    <a
+      className={children ? undefined : 'info-references-doi'}
+      href={`https://doi.org/${doi}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {children ?? `doi:${doi}`}
+    </a>
+  );
+}
+
 export default function Info({ setTab }) {
   const { data: metadata, isLoading } = useMetadata();
+  // reference key -> model keys that cite it
+  const usedBy = useMemo(() => {
+    const out = {};
+    for (const m of metadata?.models ?? []) {
+      for (const key of m.references ?? []) (out[key] ??= []).push(m.key);
+    }
+    return out;
+  }, [metadata]);
   const heroFig = useEosPhaseFigure(HERO_PARAMS);
 
   // Strip axis titles/legend for the compact hero rendering so the visual
@@ -145,7 +137,10 @@ export default function Info({ setTab }) {
     const f = heroFig.data?.figure;
     if (!f) return null;
     return {
-      data: _liftBinodalToTop(f.data),
+      // Model curves only: drop the measured points, keep the critical-point marker.
+      data: _liftBinodalToTop(
+        (f.data ?? []).filter((t) => t.mode !== 'markers' || t.legendgroup === 'LLCP')
+      ),
       layout: {
         ...(f.layout ?? {}),
         // The server now adds an internal title to all phase-diagram
@@ -153,6 +148,7 @@ export default function Info({ setTab }) {
         // Info hero is a compact stylized visual that doesn't want a
         // title, so suppress it here.
         title: { text: '' },
+        annotations: [],
         // automargin lets Plotly grow the margin as needed for the axis
         // title; the explicit numbers act as a safe floor so a quick first
         // paint isn't clipped before automargin kicks in.
@@ -178,15 +174,16 @@ export default function Info({ setTab }) {
         <div className="info-hero-text">
           <span className="tag tag-accent info-hero-badge">
             <span className="info-hero-dot" />
-            Open source · v{metadata?.version ?? '0.5.1'}
+            Open source{metadata?.version ? ` · v${metadata.version}` : ''}
           </span>
           <h1>
-            Thermodynamic equations of state for{' '}
-            <span className="info-hero-em">supercooled</span> water.
+            Thermodynamic equations of state for <span className="info-hero-em">supercooled</span>{' '}
+            water.
           </h1>
           <p>
-            A unified toolkit for {metadata?.models?.length ?? 10} equation-of-state models — explore properties, phase diagrams,
-            and the liquid-liquid phase separation through interactive visualizations.
+            A unified toolkit for {metadata?.models?.length ?? 'many'} equation-of-state models —
+            explore properties, phase diagrams, measured data, and the liquid-liquid phase
+            separation through interactive visualizations.
           </p>
           <div className="info-hero-actions">
             <button
@@ -272,6 +269,7 @@ export default function Info({ setTab }) {
                 <th>Transport</th>
                 <th>T range [K]</th>
                 <th>P range [MPa]</th>
+                <th>Reference</th>
               </tr>
             </thead>
             <tbody>
@@ -281,11 +279,23 @@ export default function Info({ setTab }) {
                   <td>{m.is_two_state ? '✓' : ''}</td>
                   <td>{m.has_phase_diagram ? '✓' : ''}</td>
                   <td>{m.has_transport ? '✓' : ''}</td>
-                  <td>
+                  <td className="nowrap">
                     {m.T_min} – {m.T_max}
                   </td>
-                  <td>
+                  <td className="nowrap">
                     {m.P_min} – {m.P_max}
+                  </td>
+                  <td>
+                    {(m.references ?? []).map((key, i) => {
+                      const r = metadata.references?.[key];
+                      if (!r) return null;
+                      return (
+                        <span key={key}>
+                          {i > 0 && '; '}
+                          <DoiLink doi={r.doi}>{r.short}</DoiLink>
+                        </span>
+                      );
+                    })}
                   </td>
                 </tr>
               ))}
@@ -296,24 +306,47 @@ export default function Info({ setTab }) {
 
       <section className="info-references">
         <h2>References</h2>
-        {REFERENCES.map((g) => (
-          <div key={g.group} className="info-references-group">
-            <div className="info-references-group-title">{g.group}</div>
+        {isLoading && <p>Loading references…</p>}
+        {(metadata?.reference_groups ?? []).map((g) => (
+          <div key={g.title} className="info-references-group">
+            <div className="info-references-group-title">{g.title}</div>
             <ul className="info-references-list">
-              {g.items.map((r, i) => (
-                <li key={r.key ?? `${g.group}-${i}`}>
-                  {r.key && <span className="tag info-references-key">{r.key}</span>}
-                  <span>{r.text}</span>
-                </li>
-              ))}
+              {g.keys.map((key) => {
+                const r = metadata.references?.[key];
+                if (!r) return null;
+                const models = usedBy[key] ?? [];
+                return (
+                  <li key={key}>
+                    <span className="tag info-references-key">{r.short}</span>
+                    <span>
+                      {r.citation} <DoiLink doi={r.doi} />
+                      {(r.notes ?? []).map((n) => (
+                        <span key={n.doi} className="info-references-extra">
+                          {n.text} <DoiLink doi={n.doi} />
+                        </span>
+                      ))}
+                      {models.length > 0 && (
+                        <span className="info-references-extra info-references-models">
+                          Models: {models.join(', ')}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}
         <div className="info-references-group">
-          <div className="info-references-group-title">
-            H₂O phase-diagram data source
-          </div>
+          <div className="info-references-group-title">H₂O phase-diagram data source</div>
           <p className="info-references-note">{SEAFREEZE_NOTE}</p>
+        </div>
+        <div className="info-references-group">
+          <div className="info-references-group-title">Measured data</div>
+          <p className="info-references-note">
+            Every point in the Measured Data tab carries its source; the tab&apos;s Sources view
+            lists them with full citations.
+          </p>
         </div>
       </section>
 
@@ -324,15 +357,13 @@ export default function Info({ setTab }) {
             <div className="info-credits-label">Author</div>
             <div>
               Anthony Consiglio ·{' '}
-              <a href="mailto:aconsiglio4@berkeley.edu">
-                aconsiglio4@berkeley.edu
-              </a>
+              <a href="mailto:aconsiglio4@berkeley.edu">aconsiglio4@berkeley.edu</a>
             </div>
           </div>
           <div>
             <div className="info-credits-label">Package</div>
             <div>
-              waterEoS v{metadata?.version ?? '0.5.1'} ·{' '}
+              waterEoS{metadata?.version ? ` v${metadata.version}` : ''} ·{' '}
               <a
                 href="https://pypi.org/project/waterEoS/"
                 target="_blank"
@@ -356,7 +387,7 @@ export default function Info({ setTab }) {
           </div>
           <div>
             <div className="info-credits-label">Built with</div>
-            <div>NumPy · SciPy · PyO3 / Rust · FastAPI · React · Plotly</div>
+            <div>NumPy · SciPy · contourpy · PyO3 / Rust · FastAPI · React · Plotly</div>
           </div>
         </div>
       </section>

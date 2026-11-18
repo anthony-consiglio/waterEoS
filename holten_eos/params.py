@@ -2,7 +2,7 @@
 Holten, Sengers & Anisimov (2014) two-state EoS parameters.
 
 Reference: V. Holten, J. V. Sengers, M. A. Anisimov,
-           J. Phys. Chem. Ref. Data 43, 014101 (2014).
+           J. Phys. Chem. Ref. Data 43, 043101 (2014).
 """
 
 import numpy as np

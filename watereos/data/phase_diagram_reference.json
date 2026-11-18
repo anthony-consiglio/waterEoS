@@ -1415,70 +1415,87 @@
  },
  "sources": {
   "bridgman1912water": {
+   "short": "Bridgman (1912)",
    "citation": "P. W. Bridgman (1912). Water, in the Liquid and Five Solid Forms, under Pressure. Proceedings of the American Academy of Arts and Sciences 47, 441.",
    "doi": "10.2307/20022754"
   },
   "caldwell1978maximum": {
+   "short": "Caldwell (1978)",
    "citation": "Douglas R. Caldwell (1978). The maximum density points of pure and saline water. Deep Sea Research 25, 175-181.",
    "doi": "10.1016/0146-6291(78)90005-x"
   },
   "evans1967premelting": {
-   "citation": "L. F. Evans (1967). J. Appl. Phys. 38, 4930.",
+   "short": "Evans (1967)",
+   "citation": "L. F. Evans (1967). Selective nucleation of the high-pressure ices. J. Appl. Phys. 38, 4930.",
    "doi": "10.1063/1.1709255"
   },
   "fine1973compressibility": {
+   "short": "Fine & Millero (1973)",
    "citation": "R. A. Fine, F. J. Millero (1973). Compressibility of water as a function of temperature and pressure. J. Chem. Phys. 59, 5529.",
    "doi": "10.1063/1.1679903"
   },
   "hawary2023highly": {
+   "short": "El Hawary & Meier (2023)",
    "citation": "Ahmed El Hawary, Karsten Meier (2023). Highly Accurate Densities and Isobaric and Isochoric Heat Capacities of Compressed Liquid Water Derived from New Speed of Sound Measurements. International Journal of Thermophysics 44, 180.",
    "doi": "10.1007/s10765-023-03276-1"
   },
   "henderson1987melting": {
+   "short": "Henderson & Speedy (1987b)",
    "citation": "Stephen J. Henderson, Robin J. Speedy (1987). Melting temperature of ice at positive and negative pressures. The Journal of Physical Chemistry 91, 3069-3072.",
    "doi": "10.1021/j100295a085"
   },
   "henderson1987temperature": {
+   "short": "Henderson & Speedy (1987a)",
    "citation": "Stephen J. Henderson, Robin J. Speedy (1987). Temperature of maximum density in water at negative pressure. The Journal of Physical Chemistry 91, 3062-3068.",
    "doi": "10.1021/j100295a084"
   },
   "holten2017compressibility": {
+   "short": "Holten et al. (2017)",
    "citation": "Vincent Holten, Chen Qiu, Emmanuel Guillerm, Max Wilke, Jaroslav Rička, Martin Frenz, Frédéric Caupin (2017). Compressibility Anomalies in Stretched Water and Their Interplay with Density Anomalies. The Journal of Physical Chemistry Letters 8, 5519-5522.",
    "doi": "10.1021/acs.jpclett.7b02563"
   },
   "kell1975density": {
+   "short": "Kell (1975)",
    "citation": "George S. Kell (1975). Density, thermal expansivity, and compressibility of liquid water from 0° to 150°. Correlations and tables for atmospheric pressure and saturation reviewed and expressed on 1968 temperature scale. Journal of Chemical & Engineering Data 20, 97-105.",
    "doi": "10.1021/je60064a005"
   },
   "marczak1997water": {
+   "short": "Marczak (1997)",
    "citation": "W. Marczak (1997). Water as a standard in the measurements of speed of sound in liquids. J. Acoust. Soc. Am. 102, 2776.",
    "doi": "10.1121/1.420332"
   },
   "maruyama2005melting": {
-   "citation": "M. Maruyama (2005). J. Cryst. Growth 275, 598.",
+   "short": "Maruyama (2005)",
+   "citation": "M. Maruyama (2005). Roughening transition of prism faces of ice crystals grown from melt under pressure. J. Cryst. Growth 275, 598.",
    "doi": "10.1016/j.jcrysgro.2004.11.432"
   },
   "mishima2011melting": {
+   "short": "Mishima (2011)",
    "citation": "Osamu Mishima (2011). Melting of the Precipitated Ice IV in LiCl Aqueous Solution and Polyamorphism of Water. The Journal of Physical Chemistry B 115, 14064-14067.",
    "doi": "10.1021/jp203669p"
   },
   "mishima2021liquidphase": {
+   "short": "Mishima (2021)",
    "citation": "Osamu Mishima (2021). Liquid-Phase Transition in Water. NIMS Monographs.",
    "doi": "10.1007/978-4-431-56915-2"
   },
   "nordell1990melting": {
-   "citation": "B. Nordell (1990). Cold Reg. Sci. Technol. 19, 83.",
-   "doi": "10.1016/0165-232x(90)90020-w"
+   "short": "Nordell (1990)",
+   "citation": "B. Nordell (1990). Measurement of P-T coexistence curve for ice-water mixture. Cold Reg. Sci. Technol. 19, 83.",
+   "doi": "10.1016/0165-232X(90)90020-W"
   },
   "pallares2016equation": {
+   "short": "Pallares et al. (2016)",
    "citation": "Gaël Pallares, Miguel A. Gonzalez, Jose Luis F. Abascal, Chantal Valeriani, Frédéric Caupin (2016). Equation of state for water and its line of density maxima down to −120 MPa. Physical Chemistry Chemical Physics 18, 5896-5900.",
    "doi": "10.1039/c5cp07580g"
   },
   "qiu2016exploration": {
+   "short": "Qiu et al. (2016)",
    "citation": "C. Qiu, Y. Krüger, M. Wilke, D. Marti, J. Rička, M. Frenz (2016). Exploration of the phase diagram of liquid water in the low-temperature metastable region using synthetic fluid inclusions. Physical Chemistry Chemical Physics 18, 28227-28241.",
    "doi": "10.1039/c6cp04250c"
   },
   "troncoso2017isobaric": {
+   "short": "Troncoso (2017)",
    "citation": "Jacobo Troncoso (2017). The isobaric heat capacity of liquid water at low temperatures and high pressures. The Journal of Chemical Physics 147, 084501.",
    "doi": "10.1063/1.4990381"
   }

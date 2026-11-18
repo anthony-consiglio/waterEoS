@@ -5,12 +5,32 @@ router = APIRouter()
 
 @router.get("/health")
 def health():
+    return {"status": "ok", "version": _package_version()}
+
+
+def _package_version():
     try:
         from importlib.metadata import version
-        ver = version("watereos")
+        return version("watereos")
     except Exception:
-        ver = "unknown"
-    return {"status": "ok", "version": ver}
+        return "unknown"
+
+
+def _references():
+    """All references with DOIs, and their display groups, for the Info page."""
+    from watereos.eos_phase_diagram import reference_points
+    from watereos.references import REFERENCE_GROUPS, REFERENCES
+
+    refs = {key: dict(entry) for key, entry in REFERENCES.items()}
+    groups = [{"title": title, "keys": list(keys)} for title, keys in REFERENCE_GROUPS]
+    points = []
+    for key, entry in reference_points()["sources"].items():
+        if key not in refs:
+            refs[key] = {"short": entry.get("short", key), "citation": entry["citation"],
+                         "doi": entry["doi"], "notes": []}
+        points.append(key)
+    groups.append({"title": "EoS phase diagram reference points", "keys": points})
+    return refs, groups
 
 
 @router.get("/metadata")
@@ -18,6 +38,7 @@ def metadata():
     from watereos.model_registry import (
         MODEL_ORDER, MODEL_REGISTRY, PROPERTY_LABELS, PROPERTY_UNITS,
     )
+    from watereos.references import MODEL_REFERENCES
     from watereos.units import UNIT_OPTIONS, UNIT_DEFAULTS, CATEGORY_LABELS
 
     models = []
@@ -32,13 +53,19 @@ def metadata():
             "T_min": info.T_min, "T_max": info.T_max,
             "P_min": info.P_min, "P_max": info.P_max,
             "properties": list(info.properties),
+            "water_model": info.water_model,
+            "references": MODEL_REFERENCES.get(key, []),
         })
     properties = {
         k: {"label": PROPERTY_LABELS.get(k, k), "unit": PROPERTY_UNITS.get(k, "")}
         for k in PROPERTY_LABELS
     }
+    references, reference_groups = _references()
     return {
+        "version": _package_version(),
         "models": models,
+        "references": references,
+        "reference_groups": reference_groups,
         "properties": properties,
         "units": {
             "options": UNIT_OPTIONS,

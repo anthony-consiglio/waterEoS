@@ -99,7 +99,7 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 
 | Model key | Reference | LLCP (T, P) |
 |-----------|-----------|-------------|
-| `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 014101 (2014) | 228.2 K, 0 MPa |
+| `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 043101 (2014) | 228.2 K, 0 MPa |
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'caupin2019_kim'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019), Table II (with-Kim variant); Kim et al., Science **358**, 1589 (2017) | 219.47 K, 58.74 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
@@ -537,7 +537,9 @@ fallback is used. Results are identical; only speed differs.
 
 ## References
 
-1. V. Holten, J. V. Sengers, and M. A. Anisimov, "Equation of state for supercooled water at pressures up to 400 MPa," *J. Phys. Chem. Ref. Data* **43**, 014101 (2014). [doi:10.1063/1.4895593](https://doi.org/10.1063/1.4895593)
+Every model's sources, with DOIs, are listed in `watereos/references.py` (`MODEL_REFERENCES`) and on the visualizer's Info page. The references below are the ones this README cites.
+
+1. V. Holten, J. V. Sengers, and M. A. Anisimov, "Equation of state for supercooled water at pressures up to 400 MPa," *J. Phys. Chem. Ref. Data* **43**, 043101 (2014). [doi:10.1063/1.4895593](https://doi.org/10.1063/1.4895593)
 
 2. F. Caupin and M. A. Anisimov, "Thermodynamics of supercooled and stretched water: Unifying two-structure description and liquid-vapor spinodal," *J. Chem. Phys.* **151**, 034503 (2019). [doi:10.1063/1.5100228](https://doi.org/10.1063/1.5100228)
    - Erratum: *J. Chem. Phys.* **163**, 039902 (2025). [doi:10.1063/5.0239673](https://doi.org/10.1063/5.0239673)
@@ -546,12 +548,12 @@ fallback is used. Results are identical; only speed differs.
 
 4. R. Shi and H. Tanaka, "The anomalies and criticality of liquid water," *Proc. Natl. Acad. Sci. U.S.A.* **117**, 26591-26599 (2020). [doi:10.1073/pnas.2008426117](https://doi.org/10.1073/pnas.2008426117) -- Source of both `shi_tanaka2020` (thermodynamic EoS, Table S2 of the SI) and `shi_tanaka2020_transport` (viscosity / self-diffusion / rotational relaxation, Table S3 of the SI).
 
-5. J. C. Grenke and J. R. Elliott, "Empirical fundamental equation of state for the metastable state of water based on the Tait-Tammann equation," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c06847](https://doi.org/10.1021/acs.jpcb.4c06847)
+5. J. H. Grenke and J. A. W. Elliott, "Analytic correlation for the thermodynamic properties of water at low temperatures (200&ndash;300 K) and high pressures (0.1&ndash;400 MPa)," *J. Phys. Chem. B* **129**, 1997-2012 (2025). [doi:10.1021/acs.jpcb.4c03909](https://doi.org/10.1021/acs.jpcb.4c03909); correction: *J. Phys. Chem. B* **129**, 9850-9853 (2025). [doi:10.1021/acs.jpcb.5c05934](https://doi.org/10.1021/acs.jpcb.5c05934)
    - Correction: *J. Phys. Chem. B* **129**, 9850-9853 (2025). [doi:10.1021/acs.jpcb.5c04618](https://doi.org/10.1021/acs.jpcb.5c04618)
 
 6. L. P. Singh, B. Issenmann, and F. Caupin, "Pressure dependence of viscosity in supercooled water and a unified approach for thermodynamic and dynamic anomalies of water," *Proc. Natl. Acad. Sci. U.S.A.* **114**, 4312-4317 (2017). [doi:10.1073/pnas.1619501114](https://doi.org/10.1073/pnas.1619501114)
 
-7. B. Journaux, J. M. Brown, A. Pacheco, S. D. Vance, A. Cochrane, T. Bollengier, et al., "Holistic approach for studying planetary hydrospheres: Gibbs representations, ices thermodynamics, transport, and the example of Europa," *J. Geophys. Res.: Planets* **125**, e2019JE006176 (2020). [doi:10.1029/2019JE006176](https://doi.org/10.1029/2019JE006176) -- Source of the SeaFreeze GLBF tensor-product B-spline coefficients used for `water1`, `IAPWS95`, and the ice phases (Ih, II, III, V, VI, VII/X) in the H₂O solid-liquid-vapor phase diagram.
+7. B. Journaux, J. M. Brown, A. Pakhomova, I. E. Collings, S. Petitgirard, P. Espinoza, T. Boffa Ballaran, S. D. Vance, J. Ott, F. Cova, G. Garbarino, and M. Hanfland, "Holistic approach for studying planetary hydrospheres: Gibbs representation of ices thermodynamics, elasticity, and the water phase diagram to 2,300 MPa," *J. Geophys. Res.: Planets* **125**, e2019JE006176 (2020). [doi:10.1029/2019JE006176](https://doi.org/10.1029/2019JE006176) -- Source of the SeaFreeze GLBF tensor-product B-spline coefficients used for `water1`, `IAPWS95`, and the ice phases (Ih, II, III, V, VI, VII/X) in the H₂O solid-liquid-vapor phase diagram.
 
 8. W. Wagner and A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," *J. Phys. Chem. Ref. Data* **31**, 387 (2002). [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829) -- Cited as IAPWS-95 throughout; reference EoS for water/vapor used for reference-state alignment, the `vapor` model (ideal-gas part and virial coefficients), and the saturation/triple-point lines in the H₂O phase diagram.
 

@@ -13,6 +13,7 @@ import argparse
 import csv
 import json
 from pathlib import Path
+import re
 import sys
 
 import numpy as np
@@ -57,14 +58,38 @@ HEAT_CAPACITY_MINIMA = {
     'in_measured_range': [False, True, True, True],
     'sources': ['troncoso2017isobaric'],
 }
-# Citations not in the database's sources table.
+# Citations not in the database's sources table, or printed there without a title (checked on Crossref).
 EXTRA_SOURCES = {
+    'evans1967premelting': ('L. F. Evans (1967). Selective nucleation of the high-pressure ices. J. Appl. Phys. 38, '
+                            '4930.', '10.1063/1.1709255'),
+    'maruyama2005melting': ('M. Maruyama (2005). Roughening transition of prism faces of ice crystals grown from '
+                            'melt under pressure. J. Cryst. Growth 275, 598.', '10.1016/j.jcrysgro.2004.11.432'),
+    'nordell1990melting': ('B. Nordell (1990). Measurement of P-T coexistence curve for ice-water mixture. Cold Reg. '
+                           'Sci. Technol. 19, 83.', '10.1016/0165-232X(90)90020-W'),
     'fine1973compressibility': ('R. A. Fine, F. J. Millero (1973). Compressibility of water as a function of '
                                 'temperature and pressure. J. Chem. Phys. 59, 5529.', '10.1063/1.1679903'),
     'marczak1997water': ('W. Marczak (1997). Water as a standard in the measurements of speed of sound in '
                          'liquids. J. Acoust. Soc. Am. 102, 2776.', '10.1121/1.420332'),
 }
 HIGH_PRESSURE_SOURCES = ('mishima2021liquidphase', 'bridgman1912water')
+# Author-year labels the citation parser cannot build: compound surnames, and two papers of one year
+# (J. Phys. Chem. 91, 3062 and 3069).
+SHORT_LABELS = {'hawary2023highly': 'El Hawary & Meier (2023)',
+                'henderson1987temperature': 'Henderson & Speedy (1987a)',
+                'henderson1987melting': 'Henderson & Speedy (1987b)'}
+
+
+def short_label(key, citation):
+    """'Kell (1975)', 'Fine & Millero (1973)' or 'Holten et al. (2017)' from 'A. Author, B. Author (2017). ...'."""
+    if key in SHORT_LABELS:
+        return SHORT_LABELS[key]
+    match = re.match(r'(.+?) \((\d{4})\)', citation)
+    if not match:
+        return key
+    authors = [a.strip() for a in re.split(r',| and ', match.group(1)) if a.strip()]
+    family = [a.split()[-1] for a in authors]
+    names = family[0] if len(family) == 1 else f'{family[0]} & {family[1]}' if len(family) == 2 else f'{family[0]} et al.'
+    return f'{names} ({match.group(2)})'
 
 
 def read(path):
@@ -117,7 +142,8 @@ def main():
     missing = sorted(used - set(table))
     if missing:
         raise SystemExit(f'no citation for {missing}')
-    data['sources'] = {key: {'citation': table[key][0], 'doi': table[key][1] or None} for key in sorted(used)}
+    data['sources'] = {key: {'short': short_label(key, table[key][0]), 'citation': table[key][0],
+                             'doi': table[key][1] or None} for key in sorted(used)}
     data['about'] = ('Measured points for watereos.eos_phase_diagram, built by '
                      'scripts/build_phase_diagram_reference.py from the curated water-property database. '
                      'Ice Ih: measured or derived H2O melting points from -140 to 400 MPa, at or above the '

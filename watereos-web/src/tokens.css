@@ -1098,6 +1098,29 @@ textarea {
   min-width: 96px;
   text-align: center;
 }
+/* Author-year labels of the reference list: one fixed-width column. */
+.info-references-list .info-references-key {
+  flex: 0 0 210px;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.info-references-doi {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.info-references-extra {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.info-references-models {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
 .info-references-note {
   margin: 0;
   font-size: 13px;
@@ -1113,12 +1136,19 @@ textarea {
   padding: 1px 5px;
   color: var(--text);
 }
-.info-references-note a {
+.info-references-note a,
+.info-references-list a,
+.models-table a {
   color: var(--accent);
   text-decoration: none;
 }
-.info-references-note a:hover {
+.info-references-note a:hover,
+.info-references-list a:hover,
+.models-table a:hover {
   text-decoration: underline;
+}
+.models-table td.nowrap {
+  white-space: nowrap;
 }
 
 .info-credits-grid {
