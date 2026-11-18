@@ -245,6 +245,26 @@ def test_points_and_conditional_get(client):
     assert client.get('/api/data/points').json()['n'] == 6
 
 
+def test_etag_follows_content_within_a_release(source, tmp_path, monkeypatch):
+    # A deploy can change a label without a new data release; a browser that
+    # revalidates its old copy must then get the new payload, not a 304.
+    url = f'sqlite:///{tmp_path / "etag.sqlite"}'
+    assert L.main(['--source', str(source), '--db', url]) == 0
+    reset_store(url)
+    try:
+        r1 = TestClient(create_app()).get('/api/data/release')
+        etag1 = r1.headers['etag']
+        monkeypatch.setitem(S.PROPERTY_LABELS, 'density', 'Density (relabeled)')
+        reset_store(url)  # a fresh process after the deploy
+        r2 = TestClient(create_app()).get('/api/data/release', headers={'If-None-Match': etag1})
+        assert r2.status_code == 200 and r2.headers['etag'] != etag1
+        assert r2.json()['release']['release_id'] == r1.json()['release']['release_id']
+        dens = next(t for t in r2.json()['tables'] if t['key'] == 'density')['properties'][0]
+        assert dens['label'] == 'Density (relabeled)'
+    finally:
+        reset_store()
+
+
 def test_row_and_sources(client):
     r = client.get('/api/data/rows/density:alpha2001made:s:0001')
     assert r.status_code == 200

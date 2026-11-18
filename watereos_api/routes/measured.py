@@ -49,8 +49,11 @@ def _store():
     return st
 
 
-def _respond(request: Request, rid: str, key, body: bytes, media_type='application/json', headers=None):
-    etag = '"' + hashlib.sha256(f'{rid}|{key}'.encode()).hexdigest()[:20] + '"'
+def _respond(request: Request, body: bytes, media_type='application/json', headers=None):
+    # The ETag follows the content, not just the release: a deploy that changes
+    # a label or a payload field without a new data release must not leave
+    # browsers revalidating their old copy with a 304.
+    etag = '"' + hashlib.sha256(body).hexdigest()[:20] + '"'
     h = {'ETag': etag, 'Cache-Control': f'public, max-age={CACHE_SECONDS}'}
     h.update(headers or {})
     if request.headers.get('if-none-match') == etag:
@@ -125,8 +128,8 @@ def release(request: Request):
         return JSONResponse({'configured': False, 'detail': 'Measured data are not configured on this server.'})
     except Unavailable as e:
         return JSONResponse({'configured': False, 'detail': str(e)}, status_code=503)
-    rid, body = _cached(st, 'release', lambda: _release_payload(st))
-    return _respond(request, rid, 'release', body)
+    _, body = _cached(st, 'release', lambda: _release_payload(st))
+    return _respond(request, body)
 
 
 # ---------------------------------------------------------------------------
@@ -155,8 +158,8 @@ def points(request: Request,
            property: Optional[str] = Query(None, max_length=80)):
     st = _store()
     key = ('points', table, property)
-    rid, body = _cached(st, key, lambda: _points_payload(st, table, property))
-    return _respond(request, rid, key, body)
+    _, body = _cached(st, key, lambda: _points_payload(st, table, property))
+    return _respond(request, body)
 
 
 @router.get('/rows/{row_id}')
@@ -183,8 +186,8 @@ def _sources_payload(st):
 @router.get('/sources')
 def sources(request: Request):
     st = _store()
-    rid, body = _cached(st, 'sources', lambda: _sources_payload(st))
-    return _respond(request, rid, 'sources', body)
+    _, body = _cached(st, 'sources', lambda: _sources_payload(st))
+    return _respond(request, body)
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +259,7 @@ def download(request: Request):
     st = _store()
     rid, body = _cached(st, 'download', lambda: _download_payload(st))
     name = f'watereos_measured_data_{rid}.zip'
-    return _respond(request, rid, 'download', body, media_type='application/zip',
+    return _respond(request, body, media_type='application/zip',
                     headers={'Content-Disposition': f'attachment; filename="{name}"'})
 
 
