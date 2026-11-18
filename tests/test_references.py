@@ -19,6 +19,9 @@ def test_every_reference_has_a_doi_and_one_group():
     assert sorted(grouped) == sorted(REFERENCES)
     for key, ref in REFERENCES.items():
         assert ref['short'] and ref['citation'], key
-        assert DOI.match(ref['doi']), key
+        if key == 'bridge29':
+            assert ref['doi'] is None and 'Manuscript' in ref['citation']
+        else:
+            assert DOI.match(ref['doi']), key
         for note in ref['notes']:
             assert note['text'] and DOI.match(note['doi']), key

@@ -43,7 +43,8 @@ def test_list_models():
     assert isinstance(models, list)
     # Real water; the equations fitted to model waters come on top
     real = [m for m in models if not MODEL_REGISTRY[m].is_model_water]
-    assert len(real) == 19
+    assert len(real) == 20
+    assert "bridge29" in real
     assert 'moynihan1996species' in real and 'mishima2023equation' in real
     assert sorted(set(models) - set(real)) == sorted(model_water_keys())
     assert 'duska2020' in models

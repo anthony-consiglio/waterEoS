@@ -124,6 +124,12 @@ export default function PointCalculator() {
               <span>HDL {(1 - x).toFixed(3)}</span>
               <span>LDL {x.toFixed(3)}</span>
             </div>
+            {modelKey === 'bridge29' && typeof results?.f === 'number' && (
+              <p className="hint">
+                The bars show the equilibrium fractions. The dynamic low-density fraction used for
+                transport is {results.f.toFixed(3)}.
+              </p>
+            )}
           </div>
         )}
 
