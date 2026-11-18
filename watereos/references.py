@@ -17,6 +17,10 @@ def _ref(short, citation, doi, notes=()):
 
 REFERENCES = {
     # Equations of state for real water
+    'bridge29': _ref(
+        'Consiglio (manuscript)',
+        'Tony Consiglio. "Bridging liquid and amorphous water with a broadly constrained equation '
+        'of state and a transport model." Manuscript in preparation.', None),
     'holten2014': _ref(
         'Holten et al. (2014)',
         'V. Holten, J. V. Sengers, and M. A. Anisimov. "Equation of state for supercooled water at pressures '
@@ -201,6 +205,7 @@ REFERENCES = {
 }
 
 MODEL_REFERENCES = {
+    'bridge29': ['bridge29'],
     'duska2020': ['duska2020'],
     'holten2014': ['holten2014'],
     'caupin2019': ['caupin2019'],
@@ -242,7 +247,7 @@ MODEL_REFERENCES = {
 
 REFERENCE_GROUPS = [
     ('Equations of state for real water',
-     ['holten2014', 'caupin2019', 'kim2017', 'duska2020', 'shi_tanaka2020', 'grenke2025', 'moynihan1996',
+     ['bridge29', 'holten2014', 'caupin2019', 'kim2017', 'duska2020', 'shi_tanaka2020', 'grenke2025', 'moynihan1996',
       'mishima2023']),
     ('Transport', ['singh2017']),
     ('PC-SAFT', ['gross2001', 'diamantonis2011', 'novak2024', 'novak2025']),

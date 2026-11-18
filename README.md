@@ -102,6 +102,7 @@ out = compute(T_K=[250, 275, 300], P_MPa=[0.1, 50, 100], model='holten2014')
 | `'holten2014'` | Holten, Sengers & Anisimov, J. Phys. Chem. Ref. Data **43**, 043101 (2014) | 228.2 K, 0 MPa |
 | `'caupin2019'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019) | 218.1 K, 72.0 MPa |
 | `'caupin2019_kim'` | Caupin & Anisimov, J. Chem. Phys. **151**, 034503 (2019), Table II (with-Kim variant); Kim et al., Science **358**, 1589 (2017) | 219.47 K, 58.74 MPa |
+| `'bridge29'` | Tony Consiglio, *Bridging liquid and amorphous water with a broadly constrained equation of state and a transport model* (manuscript) | 222.34 K, 47.65 MPa |
 | `'duska2020'` | Duska, J. Chem. Phys. **152**, 174501 (2020) | 220.9 K, 54.2 MPa |
 | `'shi_tanaka2020'` | Shi & Tanaka, PNAS **117**, 26591 (2020) | 184 K, 173 MPa |
 | `'shi_tanaka2020_transport'` | Shi & Tanaka, PNAS **117**, 26591 (2020), Tables S2/S3 (transport) | 184 K, 173 MPa |
@@ -130,6 +131,7 @@ The three two-state models accept **any** (T, P) input without raising errors, b
 | `'holten2014'` | T_H(P)&ndash;300 K, 0&ndash;400 MPa | Unbounded (any T, P) |
 | `'caupin2019'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
 | `'caupin2019_kim'` | ~200&ndash;300 K, -140&ndash;400 MPa | Unbounded (any T, P) |
+| `'bridge29'` | 100&ndash;400 K, −200 to 400 MPa (suggested plotting window, includes extrapolation) | Positive T and a physical high-density reference state above the liquid–vapor spinodal |
 | `'duska2020'` | ~200&ndash;370 K, ~-150 to 400 MPa (paper-validated 0&ndash;100 MPa; degrades at negative P) | Unbounded (any T, P) |
 | `'shi_tanaka2020'` | ~180&ndash;320 K, -110 to 200 MPa (paper-validated; agrees with IAPWS-95 to ~0.05% in ρ and a few % in κ_T, α, Cp across the liquid range) | Unbounded (any T, P) |
 | `'shi_tanaka2020_transport'` | ~180&ndash;320 K, -110 to 200 MPa (η, D, τ_R coupled to the same hierarchical two-state framework) | Unbounded (any T, P) |
@@ -274,13 +276,25 @@ from singh_viscosity import getProp
 from vapor_eos import getProp
 ```
 
+### Bridge29 thermodynamics and transport
+
+```python
+from watereos import compute
+
+water = compute(T_K=250.0, P_MPa=0.1, model="bridge29")
+print(water.rho.item(), water.D.item())  # 991.346 kg/m³, 3.917e-10 m²/s
+print(water.x.item(), water.f.item())    # 0.19864 and 0.07328
+```
+
+The Gibbs energy determines the equilibrium LDL fraction `x`. A separate dynamic fraction `f` controls viscosity `eta` (Pa·s), self-diffusion `D` (m²/s), and rotational correlation time `tau_r` (s). The transport coefficients come from the manuscript’s selected quadratic pressure dependence of the crossover temperature. Below the homogeneous nucleation line the liquid branches are model continuations constrained by amorphous-water measurements. Select **Bridge29 (Consiglio)** in the visualizer to calculate a point, compare models, explore properties, or plot its phase diagram.
+
 ### List Available Models
 
 ```python
 from watereos import list_models
 print(list_models())
 # ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
-#  'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
+#  'bridge29', 'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
 #  'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor']
 ```
 
@@ -345,7 +359,7 @@ Available functions: `find_LLCP()`, `compute_spinodal_curve()`, `compute_binodal
 
 ### EoS phase diagram figure
 
-`watereos.eos_phase_diagram` computes and draws the phase diagram shown in the visualizer's EoS Phase Diagram tab, for `caupin2019`, `caupin2019_kim`, `duska2020` and `holten2014`. One panel, 100&ndash;375 K and &minus;400 to 420 MPa:
+`watereos.eos_phase_diagram` computes and draws the phase diagram shown in the visualizer's EoS Phase Diagram tab, for `bridge29`, `caupin2019`, `caupin2019_kim`, `duska2020` and `holten2014`. One panel, 100&ndash;375 K and &minus;400 to 420 MPa:
 
 - the liquid-liquid coexistence line, its critical point, and the stability limits of the high- and low-density liquids;
 - the Widom line, where the two liquid fractions are equal above the critical point;
@@ -399,7 +413,7 @@ ldl.x[0]           # [  nan   nan 0.760 0.810 0.842 0.866]
 
 - Where the requested liquid does not exist (beyond its spinodal, or on the other side of the line `x` = 1/2 that continues the transition past the critical point), the mixture properties are `NaN`. The per-state properties (`_A`, `_B`) do not depend on the branch.
 - With `'hdl'` or `'ldl'` the output also has `metastable`, a boolean array that is `True` where the returned liquid is not the one with the lowest Gibbs energy. The transition is where it switches.
-- Available for `holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`, and for the `singh2017*` transport models, where it selects the branch of the backbone that supplies the LDS fraction. Other models raise `ValueError` for a non-default branch.
+- Available for `bridge29`, `holten2014`, `caupin2019`, `caupin2019_kim`, `duska2020`, and for the `singh2017*` transport models, where it selects the branch of the backbone that supplies the LDS fraction. Other models raise `ValueError` for a non-default branch.
 - The Rust and NumPy backends both implement it; the JAX path falls back to NumPy for a non-default branch.
 
 ### H₂O solid-liquid-vapor phase diagram

@@ -35,7 +35,8 @@ def test_metadata_serves_version_and_references():
     assert titles[-1] == "EoS phase diagram reference points"
     for group in groups:
         for key in group["keys"]:
-            assert refs[key]["doi"] and refs[key]["short"] and refs[key]["citation"]
+            assert refs[key]["short"] and refs[key]["citation"]
+            assert refs[key]["doi"] or key == "bridge29"
     for model in body["models"]:
         assert model["references"] and all(key in refs for key in model["references"])
         assert "water_model" in model

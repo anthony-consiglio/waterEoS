@@ -54,6 +54,8 @@ ATM_PRESSURE = 0.101325  # MPa
 
 #: model key -> (figure title, note on the fitted range)
 MODELS = {
+    'bridge29': ('Bridge29 (Tony Consiglio)',
+                 'The low-temperature liquid branches are continuations constrained by amorphous-water data.'),
     'caupin2019': (
         'Caupin and Anisimov (2019), corrected Table III',
         'The published fit uses data up to 300 K. Curves outside its fitted range are extrapolations.'),
@@ -119,6 +121,12 @@ def _model(model_key):
             binodal=functools.partial(phase_diagram.compute_binodal_curve, pset=pset),
             lv_spinodal=lambda T: core.spinodal_pressure(T, pset=pset)[0],
             p_min=P_RANGE[0])
+    if model_key == 'bridge29':
+        from .bridge29 import core, phase
+        return dict(batch=core.compute_batch, find_llcp=phase.find_LLCP,
+                    spinodal=phase.compute_spinodal_curve, binodal=phase.compute_binodal_curve,
+                    liquid_lines=functools.partial(phase.liquid_lines, T_RANGE[0], P_RANGE[1]),
+                    lv_spinodal=phase.vapor_spinodal, p_min=P_RANGE[0])
     if model_key == 'duska2020':
         from duska_eos import core, params, phase_diagram
         return dict(
@@ -330,8 +338,9 @@ def liquid_liquid_lines(model_key):
         model = _model(model_key)
         llcp = model['find_llcp']()
         tc, pc = float(llcp['T_K']), float(llcp['p_MPa'])
-        T, P = _grid(model)
-        _cache[key] = {'llcp': {'T_K': tc, 'p_MPa': pc}, **_liquid_liquid_lines(model, tc, pc, T, P)}
+        lines = (model['liquid_lines']() if 'liquid_lines' in model else
+                 _liquid_liquid_lines(model, tc, pc, *_grid(model)))
+        _cache[key] = {'llcp': {'T_K': tc, 'p_MPa': pc}, **lines}
     return _cache[key]
 
 
@@ -521,8 +530,16 @@ def compute_eos_phase_diagram(model_key):
         keep = p_lv >= PLOT_P_RANGE[0] - 50.0
         lv_spinodal = np.column_stack((T[keep], p_lv[keep]))
 
-    props = _evaluate(batch, tt.ravel(), np.where(valid, pp, 0.0).ravel())
-    props = {k: np.asarray(props[k], float).reshape(tt.shape) for k in ('G', 'x', 'rho', 'Kt', 'Ks', 'Cp', 'vel')}
+    # The plot needs seven fields from a batch of over 400,000 states. Evaluate
+    # in blocks so the other mixture and pure-state derivatives stay temporary.
+    keys = ('G', 'x', 'rho', 'Kt', 'Ks', 'Cp', 'vel')
+    props = {k: np.empty(tt.shape) for k in keys}
+    pressures = np.where(valid, pp, 0.).ravel()
+    for start in range(0, tt.size, 16384):
+        sl = slice(start, start + 16384)
+        block = _evaluate(batch, tt.ravel()[sl], pressures[sl])
+        for k in keys:
+            props[k].ravel()[sl] = block[k]
     for k in ('rho', 'Kt', 'Ks', 'Cp', 'vel'):
         valid &= np.isfinite(props[k]) & (props[k] > 0)
     props['kT'] = 1.0 / props['Kt']
