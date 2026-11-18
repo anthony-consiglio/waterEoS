@@ -21,3 +21,21 @@ def test_metadata_matches_registry():
     assert body["units"]["defaults"] == UNIT_DEFAULTS
     assert "rho" in body["properties"]
     assert body["properties"]["rho"]["unit"]  # non-empty unit string
+
+
+def test_metadata_serves_version_and_references():
+    import re
+    from watereos.references import REFERENCE_GROUPS
+
+    body = client.get("/api/metadata").json()
+    assert re.match(r"^\d+\.\d+\.\d+", body["version"])
+    refs, groups = body["references"], body["reference_groups"]
+    titles = [g["title"] for g in groups]
+    assert titles[:len(REFERENCE_GROUPS)] == [title for title, _ in REFERENCE_GROUPS]
+    assert titles[-1] == "EoS phase diagram reference points"
+    for group in groups:
+        for key in group["keys"]:
+            assert refs[key]["doi"] and refs[key]["short"] and refs[key]["citation"]
+    for model in body["models"]:
+        assert model["references"] and all(key in refs for key in model["references"])
+        assert "water_model" in model

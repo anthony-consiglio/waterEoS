@@ -2,7 +2,7 @@
 
 > Gibbs-energy-based two-state model treating supercooled liquid water as a pressure-additive mixture of high-density (HDL) and low-density (LDL) structural states.
 
-**Reference:** V. Holten, J. V. Sengers, M. A. Anisimov, "Equation of state for supercooled water at pressures up to 400 MPa," *J. Phys. Chem. Ref. Data* **43**, 014101 (2014).
+**Reference:** V. Holten, J. V. Sengers, M. A. Anisimov, "Equation of state for supercooled water at pressures up to 400 MPa," *J. Phys. Chem. Ref. Data* **43**, 043101 (2014).
 
 ## Overview
 

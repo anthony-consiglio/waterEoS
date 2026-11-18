@@ -12,7 +12,7 @@ Spinodal:  d²g/dx² = 0  =>  1/(x*(1-x)) = 2*omega
 LLCP:      x = 1/2, L = 0, omega = 2
 
 Reference: V. Holten, J. V. Sengers, M. A. Anisimov,
-           J. Phys. Chem. Ref. Data 43, 014101 (2014).
+           J. Phys. Chem. Ref. Data 43, 043101 (2014).
 """
 
 import numpy as np

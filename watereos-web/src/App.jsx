@@ -65,6 +65,7 @@ export default function App() {
         current={tab}
         onChange={setTab}
         onOpenPalette={() => setPaletteOpen(true)}
+        version={metadata?.version}
       />
       <main className={'shell' + (tab === 'info' || tab === 'settings' ? ' no-sidebar' : '')}>
         <Suspense fallback={<div className="screen-loading">Loading…</div>}>

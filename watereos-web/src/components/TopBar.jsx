@@ -1,13 +1,13 @@
 import { useTheme } from '../theme/ThemeContext.jsx';
 
-export function TopBar({ tabs, current, onChange, onOpenPalette }) {
+export function TopBar({ tabs, current, onChange, onOpenPalette, version }) {
   const { theme, toggle } = useTheme();
   return (
     <header className="topbar">
       <div className="brand">
         <div className="brand-mark">w</div>
         <span>waterEoS</span>
-        <span className="brand-sub">v0.4.0</span>
+        {version && <span className="brand-sub">v{version}</span>}
       </div>
       <nav className="nav-tabs">
         {tabs.map((t) => (
