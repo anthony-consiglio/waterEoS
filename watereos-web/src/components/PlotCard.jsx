@@ -38,7 +38,18 @@ const Plot = lazy(async () => {
   return { default: createPlotlyComponent(Plotly) };
 });
 
-export function PlotCard({ title, subtitle, figure, loading, error, toolbar, bare = false, className }) {
+export function PlotCard({
+  title,
+  subtitle,
+  figure,
+  loading,
+  error,
+  toolbar,
+  bare = false,
+  className,
+  onClick,
+  footer,
+}) {
   return (
     <div className={'plot-card' + (className ? ' ' + className : '')}>
       {!bare && (
@@ -65,10 +76,12 @@ export function PlotCard({ title, subtitle, figure, loading, error, toolbar, bar
               config={{ displaylogo: false, responsive: true }}
               useResizeHandler
               style={{ width: '100%', height: '100%' }}
+              onClick={onClick}
             />
           </Suspense>
         )}
       </div>
+      {footer}
     </div>
   );
 }

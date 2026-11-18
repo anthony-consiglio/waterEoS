@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from watereos_api.routes import api_router
 
@@ -75,6 +76,9 @@ def create_app() -> FastAPI:
         ).split(",") if o.strip()],
         allow_methods=["*"], allow_headers=["*"],
     )
+    # Figure and measured-data responses are large, repetitive JSON; gzip
+    # cuts them by 10-20x for clients that accept it.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.include_router(api_router)
 
     @app.exception_handler(Exception)

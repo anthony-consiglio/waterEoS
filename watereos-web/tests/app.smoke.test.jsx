@@ -18,7 +18,7 @@ function wrap(ui) {
 }
 
 describe('App shell', () => {
-  it('renders TopBar with all 7 tabs', async () => {
+  it('renders TopBar with all 8 tabs', async () => {
     vi.spyOn(client, 'fetchMetadata').mockResolvedValue({
       models: [],
       properties: {},
@@ -32,6 +32,7 @@ describe('App shell', () => {
       'H₂O Phase Diagram',
       'EoS Phase Diagram',
       'Model Comparison',
+      'Measured Data',
       'Point Calculator',
       'Settings',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());

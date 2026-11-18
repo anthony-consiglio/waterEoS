@@ -6,3 +6,5 @@ gunicorn>=21.2
 .
 fastapi>=0.115
 uvicorn[standard]>=0.30
+# PostgreSQL driver for the measured-data database (watereos_api/measured)
+psycopg[binary]>=3.2

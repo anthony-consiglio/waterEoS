@@ -7,7 +7,12 @@
 # the dist bundle copied in. gunicorn serves both /api/* and the SPA
 # shell from one process. See watereos_api/app.py.
 #
-# Railway auto-builds this Dockerfile on each push to master.
+# The Railway service is not connected to GitHub: a push to master deploys
+# nothing. Deploy with `railway up` from a clean `git archive` of the commit,
+# so that only tracked files are uploaded (docs/measured_data.md).
+#
+# The Measured Data tab reads a database named by WATEREOS_DATA_URL (or
+# DATABASE_URL); without one the tab says the data are not configured.
 
 # -----------------------------------------------------------------------------
 # Stage 1: build the React bundle

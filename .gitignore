@@ -58,3 +58,6 @@ references/*
 
 # Local tool settings
 .claude/
+
+# Local measured-data database written by watereos_api.measured.load
+.measured-data/
