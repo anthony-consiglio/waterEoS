@@ -82,26 +82,66 @@ Node's own `localStorage` otherwise hides jsdom's and every frontend test fails 
 
 ## Production on Railway
 
-The Railway service is **not** connected to GitHub: merging to `master` deploys nothing. Each step below changes the
-production project and is the owner's decision.
+The Railway service is **not** connected to GitHub: merging to `master` deploys nothing. Changes to the production
+project are the owner's decision.
 
-1. **Database.** In the Railway project, add a PostgreSQL service. In the visualizer service's variables, add
-   `WATEREOS_DATA_URL` as a reference to the database's private URL (`${{Postgres.DATABASE_URL}}`).
-2. **Load a release** from a machine that has `fitting_data/`, letting the Railway CLI supply the credentials so they
-   are never typed or stored:
+### The database
 
-   ```bash
-   railway run --service Postgres -- sh -c \
-     'python -m watereos_api.measured.load --source /path/to/fitting_data --db "$DATABASE_PUBLIC_URL"'
-   ```
+A private PostgreSQL service, `Postgres`, in the visualizer's Railway project. It has no public address. The
+visualizer service reads it through Railway's private network:
 
-   The load replaces the previous release in one transaction; the site shows the new release id within a minute.
-   Load when a build of `fitting_data` is worth publishing, not after every build.
-3. **Deploy the app** from a clean copy of the merged commit, so that only tracked files are uploaded:
+```
+WATEREOS_DATA_URL=${{Postgres.DATABASE_URL}}
+```
 
-   ```bash
-   d=$(mktemp -d) && git archive origin/master | tar -x -C "$d" && cd "$d" && \
-     railway up --detach --project <project id> --service <service id> --environment <environment id>
-   ```
+The database sorts text with `en_US.utf8`; the API sorts rows itself, so its answers and the download are the same as
+from a local SQLite copy.
+
+### Loading a release
+
+Load when a build of `fitting_data` is worth publishing, not after every build. The load replaces the previous release
+in one transaction, and the site shows the new release id within a minute, with no redeploy.
+
+The database is reached through Railway's SSH with a local port forward. This needs, once, an SSH key on the machine
+registered with the Railway account that owns the project:
+
+```bash
+ssh-keygen -t ed25519
+```
+
+```bash
+railway ssh keys add
+```
+
+Then, from a folder linked to the project (`railway link`):
+
+```bash
+cfg=$(mktemp)
+railway ssh config --service Postgres --path "$cfg" --alias watereos-pg --identity-file ~/.ssh/id_ed25519
+ssh -F "$cfg" -o UserKnownHostsFile="$cfg.hosts" -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes \
+    -f -N -L 127.0.0.1:15432:localhost:5432 watereos-pg
+railway run --service Postgres -- sh -c 'cd /path/to/waterEoS && \
+    WATEREOS_DATA_URL="postgresql://$PGUSER:$PGPASSWORD@127.0.0.1:15432/$PGDATABASE" \
+    python -m watereos_api.measured.load --source /path/to/fitting_data'
+pkill -f 'L 127.0.0.1:15432:localhost:5432 watereos-pg'
+```
+
+The SSH settings and host key go to temporary files, so `~/.ssh/config` is not touched. `railway run` hands the
+database password to the loader; it is never typed and does not appear on the command line or in the shell history.
+Add `--forbid` terms (local folder names) to the loader as needed. To check a load, point the API at the same URL
+and compare `/api/data/release` with a local SQLite load of the same tables: the release id is the date and a hash of
+the inputs, so the two match.
+
+The alternative, a public TCP proxy on the database (`railway tcp-proxy create --service Postgres --port 5432`), makes
+it reachable from the internet with password authentication. It is not used.
+
+### Deploying the app
+
+From a clean copy of the merged commit, so that only tracked files are uploaded:
+
+```bash
+d=$(mktemp -d) && git archive origin/master | tar -x -C "$d" && cd "$d" && \
+  railway up --detach --project <project id> --service <service id> --environment <environment id>
+```
 
 The ids are in the service's dashboard URL. The image installs `psycopg[binary]` from `requirements-web.txt`.
