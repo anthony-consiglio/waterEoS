@@ -23,6 +23,9 @@ const TABS = [
   { key: 'settings', label: 'Settings', Component: Settings },
 ];
 
+// Tabs that lay out their own screen, without the shared sidebar.
+const NO_SIDEBAR = new Set(['info', 'settings', 'h2o']);
+
 export default function App() {
   const [tab, setTab] = useState('info');
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -67,7 +70,7 @@ export default function App() {
         onOpenPalette={() => setPaletteOpen(true)}
         version={metadata?.version}
       />
-      <main className={'shell' + (tab === 'info' || tab === 'settings' ? ' no-sidebar' : '')}>
+      <main className={'shell' + (NO_SIDEBAR.has(tab) ? ' no-sidebar' : '')}>
         <Suspense fallback={<div className="screen-loading">Loading…</div>}>
           <Current setTab={setTab} />
         </Suspense>

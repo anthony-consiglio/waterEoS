@@ -55,13 +55,14 @@ const CONCEPTS = [
 // because it's a data-provenance note, not a paper reference.
 const SEAFREEZE_NOTE = (
   <>
-    The thermodynamic data driving the <code>water1</code> liquid model and every ice phase in the
-    H₂O Phase Diagram tab (Ice Ih, II, III, V, VI, and the French–Redmer Ice VII/X parametrization)
-    is taken from the{' '}
+    The thermodynamic data driving the <code>water1</code> liquid model and the ice phases (Ice Ih,
+    II, III, V, VI, and the French–Redmer Ice VII/X parametrization) is taken from the{' '}
     <a href="https://github.com/Bjournaux/SeaFreeze" target="_blank" rel="noopener noreferrer">
       SeaFreeze
     </a>{' '}
-    project.
+    project. The H₂O Phase Diagram tab draws water + NaCl with the Holten et al. (2014) liquid, the
+    SeaFreeze ices Ih–VI, the waterEoS vapor and an osmotic virial solution model; its figures are
+    computed with cryo-isochoric, and its Notes give the model of each figure.
   </>
 );
 

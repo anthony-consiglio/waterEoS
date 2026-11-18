@@ -11,8 +11,10 @@
 # nothing. Deploy with `railway up` from a clean `git archive` of the commit,
 # so that only tracked files are uploaded (docs/measured_data.md).
 #
-# The Measured Data tab reads a database named by WATEREOS_DATA_URL (or
-# DATABASE_URL); without one the tab says the data are not configured.
+# The Measured Data and H2O Phase Diagram tabs read a database named by
+# WATEREOS_DATA_URL (or DATABASE_URL; the atlas also WATEREOS_ATLAS_URL);
+# without one the tabs say their data are not configured. See
+# docs/measured_data.md and docs/h2o_atlas.md.
 
 # -----------------------------------------------------------------------------
 # Stage 1: build the React bundle

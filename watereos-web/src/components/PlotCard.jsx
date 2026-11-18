@@ -1,27 +1,10 @@
 import { Suspense, lazy } from 'react';
 
-// Use react-plotly.js's factory + plotly.js-dist-min so we don't pull in the
-// full plotly.js (~3 MB unminified). Both modules are loaded lazily.
-//
-// Vite's dev-mode ESM-from-CJS interop can wrap a CJS module's `default`
-// export inside another `default` (the module already shapes itself as
-// `{ default: fn }`, then Vite places the whole exports object on
-// `namespace.default`). The production Rollup build resolves this in one
-// step. To work in both, we walk the `.default` chain looking for the
-// actual value that matches a shape predicate.
-function unwrap(mod, isMatch, maxDepth = 4) {
-  let v = mod;
-  for (let i = 0; i < maxDepth && v != null; i++) {
-    if (isMatch(v)) return v;
-    if (typeof v === 'object' && 'default' in v && v.default !== v) {
-      v = v.default;
-    } else {
-      break;
-    }
-  }
-  return null;
-}
+import { unwrap } from '../plotlyModule.js';
 
+// Use react-plotly.js's factory + plotly.js-dist-min so we don't pull in the
+// full plotly.js (~3 MB unminified). Both modules are loaded lazily; unwrap
+// resolves Vite's dev-mode interop (see plotlyModule.js).
 const Plot = lazy(async () => {
   const [plotlyMod, factoryMod] = await Promise.all([
     import('plotly.js-dist-min'),
