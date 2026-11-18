@@ -394,6 +394,13 @@ fn caupin_compute_batch<'py>(
         Ok(s) => s,
         Err(_) => { p_vec = p_mpa.as_array().to_vec(); &p_vec }
     };
+    if t_data.len() != p_data.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "t_k and p_mpa must have the same length ({} != {})",
+            t_data.len(),
+            p_data.len()
+        )));
+    }
     let n = t_data.len();
 
     let mut rho = Array1::<f64>::zeros(n); let mut v = Array1::<f64>::zeros(n);

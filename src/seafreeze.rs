@@ -568,7 +568,13 @@ pub fn sf_getprop_scatter<'py>(
     })?;
     let p_arr = p.as_array().to_vec();
     let t_arr = t.as_array().to_vec();
-    assert_eq!(p_arr.len(), t_arr.len(), "scatter mode needs equal-length P and T");
+    if p_arr.len() != t_arr.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "scatter mode needs P and T of the same length ({} != {})",
+            p_arr.len(),
+            t_arr.len()
+        )));
+    }
     let n = p_arr.len();
 
     let arrays = py.allow_threads(|| {
@@ -607,7 +613,13 @@ pub fn sf_eval_raw<'py>(
             .expect("shape mismatch in raw grid eval");
         Ok(arr.into_pyarray(py).into_any())
     } else {
-        assert_eq!(p_arr.len(), t_arr.len());
+        if p_arr.len() != t_arr.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "grid=False needs P and T of the same length ({} != {})",
+                p_arr.len(),
+                t_arr.len()
+            )));
+        }
         let vals: Vec<f64> = py.allow_threads(|| {
             map_indexed(p_arr.len(), RAW_PAR_GRAIN, |i| {
                 eval_point(sp, p_arr[i], t_arr[i], deriv_p, deriv_t)
