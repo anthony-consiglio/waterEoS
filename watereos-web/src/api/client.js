@@ -68,3 +68,6 @@ export const fetchDataLines = () => _get('/api/data/lines');
 export const fetchModelCurves = (body) => _post('/api/data/model-curves', body);
 export const fetchModelSurface = (body) => _post('/api/data/model-surface', body);
 export const dataDownloadUrl = () => `${getBase()}/api/data/download`;
+export const fetchAtlasManifest = () => _get('/api/atlas/manifest');
+export const fetchAtlasFile = (solute, name) =>
+  _get(`/api/atlas/${encodeURIComponent(solute)}/${encodeURIComponent(name)}`);

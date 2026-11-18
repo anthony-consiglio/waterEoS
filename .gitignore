@@ -61,3 +61,6 @@ references/*
 
 # Local measured-data database written by watereos_api.measured.load
 .measured-data/
+
+# Local phase-diagram atlas database written by watereos_api.atlas.load
+.atlas-data/
