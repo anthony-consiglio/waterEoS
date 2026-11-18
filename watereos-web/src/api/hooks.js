@@ -38,3 +38,61 @@ export function usePoint(params, enabled = true) {
   const body = enabled && params ? { ...params, units } : null;
   return useSWR(body && ['/api/point', body], ([, b]) => client.fetchPoint(b), SWR_OPTS);
 }
+
+// ---------------------------------------------------------------------------
+// Measured data
+// ---------------------------------------------------------------------------
+const DATA_OPTS = { ...SWR_OPTS, revalidateIfStale: false };
+
+export function useDataRelease() {
+  return useSWR('/api/data/release', client.fetchDataRelease, DATA_OPTS);
+}
+
+// `table` null loads every row (the coverage map); `enabled` false loads nothing.
+export function useDataPoints(table, property, enabled = true) {
+  const key = enabled ? ['/api/data/points', table ?? '', property ?? ''] : null;
+  return useSWR(key, ([, t, p]) => client.fetchDataPoints(t || null, p || null), DATA_OPTS);
+}
+
+export function useDataSources(enabled = true) {
+  return useSWR(enabled ? '/api/data/sources' : null, client.fetchDataSources, DATA_OPTS);
+}
+
+export function useDataLines(enabled = true) {
+  return useSWR(enabled ? '/api/data/lines' : null, client.fetchDataLines, DATA_OPTS);
+}
+
+export function useDataRow(id) {
+  return useSWR(id ? ['/api/data/rows', id] : null, ([, i]) => client.fetchDataRow(i), DATA_OPTS);
+}
+
+export function useModelCurves(body) {
+  return useSWR(
+    body ? ['/api/data/model-curves', body] : null,
+    ([, b]) => client.fetchModelCurves(b),
+    DATA_OPTS
+  );
+}
+
+// One request per model; returns { data: [surface, ...], isLoading, error }.
+export function useModelSurfaces(property, models, T_range, P_range, n = 60) {
+  const key =
+    property && models.length && T_range && P_range
+      ? [
+          '/api/data/model-surface',
+          property,
+          models.join(','),
+          T_range.join(','),
+          P_range.join(','),
+          n,
+        ]
+      : null;
+  return useSWR(
+    key,
+    () =>
+      Promise.all(
+        models.map((model) => client.fetchModelSurface({ property, model, T_range, P_range, n }))
+      ),
+    DATA_OPTS
+  );
+}

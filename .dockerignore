@@ -44,3 +44,6 @@ docs
 
 # Test scaffolding
 tests
+
+# Local measured-data database (production reads PostgreSQL)
+.measured-data

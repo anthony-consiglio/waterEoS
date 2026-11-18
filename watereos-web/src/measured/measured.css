@@ -1,0 +1,391 @@
+/* Measured Data screen. Built on the tokens in src/tokens.css. */
+
+.md-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.md-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad-4);
+  padding: var(--pad-4) var(--pad-5) 0;
+  flex-wrap: wrap;
+}
+.md-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.md-release {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.md-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.md-header-actions .btn {
+  text-decoration: none;
+}
+
+.md-cite {
+  margin: var(--pad-3) var(--pad-5) 0;
+  padding: var(--pad-3) var(--pad-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  background: var(--bg-elev);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.md-cite p {
+  margin: 0 0 6px;
+}
+.md-cite code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.md-banner {
+  margin: var(--pad-3) var(--pad-5) 0;
+  padding: 8px 12px;
+  border-radius: var(--r-3);
+  border: 1px solid color-mix(in oklab, #f59e0b 45%, transparent);
+  background: color-mix(in oklab, #f59e0b 10%, transparent);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.md-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.md-body > .plot-card {
+  margin-top: var(--pad-3);
+}
+
+.md-caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+/* sidebar pieces */
+.md-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-3);
+}
+.md-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.md-filter-group {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.md-filter-group > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+.md-filter-group > summary::-webkit-details-marker {
+  display: none;
+}
+.md-filter-group > summary::after {
+  content: '▸';
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.md-filter-group[open] > summary::after {
+  content: '▾';
+}
+.md-filter-group[open] > summary {
+  margin-bottom: 6px;
+}
+.md-filter-badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent);
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.md-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.md-checklist-search {
+  height: 28px;
+  font-size: 12px;
+}
+.md-checklist-links {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.md-checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.md-check-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  padding: 2px 0;
+  cursor: pointer;
+  position: relative;
+}
+.md-check-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.md-check-row input:checked + .check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.md-check-row input:checked + .check-box::after {
+  content: '';
+  width: 8px;
+  height: 5px;
+  border-left: 1.5px solid white;
+  border-bottom: 1.5px solid white;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.md-check-row input:focus-visible + .check-box {
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.md-check-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-check-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.md-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+.md-link:hover {
+  text-decoration: underline;
+}
+.md-muted {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.md-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+
+/* rows and sources */
+.md-table-card {
+  flex: 1;
+  margin: var(--pad-3) var(--pad-5) var(--pad-5);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.md-table-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.md-table-scroll {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.md-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-elev);
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.md-table th.num,
+.md-table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.md-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-table tbody tr {
+  cursor: pointer;
+}
+.md-table tbody tr:hover td {
+  background: var(--bg-tint);
+}
+.md-table tbody tr.selected td {
+  background: var(--accent-soft);
+}
+.md-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.md-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.md-sources li {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+}
+.md-source-cite {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.md-source-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.md-source-actions {
+  grid-row: span 2;
+  align-self: center;
+}
+
+/* detail drawer */
+.md-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 92%);
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-3);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+.md-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.md-drawer-body {
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  font-size: 12.5px;
+}
+.md-drawer h3 {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+.md-kv {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 3px 10px;
+}
+.md-kv dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-top: 1px;
+}
+.md-kv dd {
+  margin: 0;
+  word-break: break-word;
+  line-height: 1.45;
+}
+.md-drawer a {
+  color: var(--accent);
+}
+
+/* Segmented controls that fill the sidebar width (four views do not fit as inline buttons). */
+.md-fill .seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: 100%;
+}
+.md-fill .seg-opt {
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.md-sources a,
+.md-cite a {
+  color: var(--accent);
+}

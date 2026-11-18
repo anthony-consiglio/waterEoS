@@ -9,6 +9,7 @@ const H2OPhaseDiagram = lazy(() => import('./screens/H2OPhaseDiagram.jsx'));
 const EoSPhaseDiagram = lazy(() => import('./screens/EoSPhaseDiagram.jsx'));
 const ModelComparison = lazy(() => import('./screens/ModelComparison.jsx'));
 const PointCalculator = lazy(() => import('./screens/PointCalculator.jsx'));
+const MeasuredData = lazy(() => import('./screens/MeasuredData.jsx'));
 const Settings = lazy(() => import('./screens/Settings.jsx'));
 
 const TABS = [
@@ -17,6 +18,7 @@ const TABS = [
   { key: 'h2o', label: 'H₂O Phase Diagram', Component: H2OPhaseDiagram },
   { key: 'eos', label: 'EoS Phase Diagram', Component: EoSPhaseDiagram },
   { key: 'compare', label: 'Model Comparison', Component: ModelComparison },
+  { key: 'data', label: 'Measured Data', Component: MeasuredData },
   { key: 'point', label: 'Point Calculator', Component: PointCalculator },
   { key: 'settings', label: 'Settings', Component: Settings },
 ];
