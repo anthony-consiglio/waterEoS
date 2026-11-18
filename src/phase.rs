@@ -824,6 +824,28 @@ pub fn compute_spinodal_duska<'py>(
 // PyO3 wrappers — Binodal
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// The spinodal arrays a binodal starts from, one entry per pressure. Arrays
+/// of unequal length raise ValueError instead of indexing past the end.
+fn read_spinodal(
+    spin_p: &PyReadonlyArray1<'_, f64>,
+    spin_t_upper: &PyReadonlyArray1<'_, f64>,
+    spin_t_lower: &PyReadonlyArray1<'_, f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let sp = spin_p.as_array().to_vec();
+    let tu = spin_t_upper.as_array().to_vec();
+    let tl = spin_t_lower.as_array().to_vec();
+    if tu.len() != sp.len() || tl.len() != sp.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "spin_p, spin_t_upper and spin_t_lower must have the same length \
+             ({}, {}, {})",
+            sp.len(),
+            tu.len(),
+            tl.len()
+        )));
+    }
+    Ok((sp, tu, tl))
+}
+
 #[pyfunction]
 pub fn compute_binodal_caupin<'py>(
     py: Python<'py>,
@@ -833,9 +855,7 @@ pub fn compute_binodal_caupin<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.as_array().to_vec();
-    let tu = spin_t_upper.as_array().to_vec();
-    let tl = spin_t_lower.as_array().to_vec();
+    let (sp, tu, tl) = read_spinodal(&spin_p, &spin_t_upper, &spin_t_lower)?;
     let result = compute_binodal_impl::<CaupinPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -849,9 +869,7 @@ pub fn compute_binodal_caupin_kim<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.as_array().to_vec();
-    let tu = spin_t_upper.as_array().to_vec();
-    let tl = spin_t_lower.as_array().to_vec();
+    let (sp, tu, tl) = read_spinodal(&spin_p, &spin_t_upper, &spin_t_lower)?;
     let result = compute_binodal_impl::<CaupinKimPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -865,9 +883,7 @@ pub fn compute_binodal_holten<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.as_array().to_vec();
-    let tu = spin_t_upper.as_array().to_vec();
-    let tl = spin_t_lower.as_array().to_vec();
+    let (sp, tu, tl) = read_spinodal(&spin_p, &spin_t_upper, &spin_t_lower)?;
     let result = compute_binodal_impl::<HoltenPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -881,9 +897,7 @@ pub fn compute_binodal_duska<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.as_array().to_vec();
-    let tu = spin_t_upper.as_array().to_vec();
-    let tl = spin_t_lower.as_array().to_vec();
+    let (sp, tu, tl) = read_spinodal(&spin_p, &spin_t_upper, &spin_t_lower)?;
     let result = compute_binodal_impl::<DuskaPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
