@@ -536,8 +536,8 @@ pub fn sf_getprop_grid<'py>(
     let sp = get_phase(phase).ok_or_else(|| {
         pyo3::exceptions::PyValueError::new_err(format!("unknown phase '{phase}'"))
     })?;
-    let p_arr = p.as_slice()?.to_vec();
-    let t_arr = t.as_slice()?.to_vec();
+    let p_arr = p.as_array().to_vec();
+    let t_arr = t.as_array().to_vec();
     let n_p = p_arr.len();
     let n_t = t_arr.len();
 
@@ -566,8 +566,8 @@ pub fn sf_getprop_scatter<'py>(
     let sp = get_phase(phase).ok_or_else(|| {
         pyo3::exceptions::PyValueError::new_err(format!("unknown phase '{phase}'"))
     })?;
-    let p_arr = p.as_slice()?.to_vec();
-    let t_arr = t.as_slice()?.to_vec();
+    let p_arr = p.as_array().to_vec();
+    let t_arr = t.as_array().to_vec();
     assert_eq!(p_arr.len(), t_arr.len(), "scatter mode needs equal-length P and T");
     let n = p_arr.len();
 
@@ -592,8 +592,8 @@ pub fn sf_eval_raw<'py>(
     let sp = get_phase(phase).ok_or_else(|| {
         pyo3::exceptions::PyValueError::new_err(format!("unknown phase '{phase}'"))
     })?;
-    let p_arr = p.as_slice()?.to_vec();
-    let t_arr = t.as_slice()?.to_vec();
+    let p_arr = p.as_array().to_vec();
+    let t_arr = t.as_array().to_vec();
     if grid {
         let n_p = p_arr.len();
         let n_t = t_arr.len();

@@ -1,7 +1,7 @@
 //! Caupin & Anisimov (2019) two-state EoS — Rust implementation.
 
 use numpy::ndarray::Array1;
-use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -388,11 +388,11 @@ fn caupin_compute_batch<'py>(
     let p_vec: Vec<f64>;
     let t_data: &[f64] = match t_k.as_slice() {
         Ok(s) => s,
-        Err(_) => { t_vec = t_k.to_vec()?; &t_vec }
+        Err(_) => { t_vec = t_k.as_array().to_vec(); &t_vec }
     };
     let p_data: &[f64] = match p_mpa.as_slice() {
         Ok(s) => s,
-        Err(_) => { p_vec = p_mpa.to_vec()?; &p_vec }
+        Err(_) => { p_vec = p_mpa.as_array().to_vec(); &p_vec }
     };
     let n = t_data.len();
 
