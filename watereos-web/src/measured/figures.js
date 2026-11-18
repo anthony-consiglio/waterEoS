@@ -234,10 +234,11 @@ function symbolsFor(c, idx, three, nonThermo) {
   });
 }
 
-function errorBar(arr, idx, color, show) {
-  if (!show || !arr) return undefined;
-  const a = idx.map((i) => (arr[i] != null && Number.isFinite(arr[i]) ? arr[i] : 0));
-  if (!a.some((v) => v > 0)) return undefined;
+// Error bars of the rows `idx`; zero where no uncertainty is given. With
+// `keepEmpty` false, undefined when none is given at all.
+function errorBar(arr, idx, color, keepEmpty) {
+  const a = idx.map((i) => (arr && arr[i] != null && Number.isFinite(arr[i]) ? arr[i] : 0));
+  if (!keepEmpty && !a.some((v) => v > 0)) return undefined;
   return { type: 'data', array: a, visible: true, thickness: 1, width: 0, color };
 }
 
@@ -254,12 +255,19 @@ function markerTraces(o) {
     if (three) t.z = ids.map((i) => Z[i]);
     return t;
   };
+  // In 2D, every trace carries both error_x and error_y while error bars are
+  // on, even when no row of it has an uncertainty. Plotly's WebGL error bars
+  // (regl-error2d) keep the previous bars of a trace whose error_x or error_y
+  // disappears, with their old point count and offset; when the plot then has
+  // fewer points, the update throws ("offset is out of bounds"), Plotly is
+  // left half-updated, and the next update draws the old points again on the
+  // new axes.
   const errs = (ids, color) => {
     const e = {};
     if (!errors) return e;
-    const ex = errorBar(errors.x, ids, color, true);
-    const ey = errorBar(errors.y, ids, color, true);
-    const ez = three ? errorBar(errors.z, ids, color, true) : undefined;
+    const ex = errorBar(errors.x, ids, color, !three);
+    const ey = errorBar(errors.y, ids, color, !three);
+    const ez = three ? errorBar(errors.z, ids, color, false) : undefined;
     if (ex) e.error_x = ex;
     if (ey) e.error_y = ey;
     if (ez) e.error_z = ez;

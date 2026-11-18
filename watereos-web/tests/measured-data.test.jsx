@@ -213,6 +213,40 @@ describe('measured-data helpers', () => {
     expect(fig.layout.yaxis.title.text).toBe('Density ρ (kg/m³)');
   });
 
+  it('gives every 2D marker trace both error bars while error bars are on', () => {
+    // Plotly's WebGL error bars break when a trace's error_x or error_y comes
+    // and goes between updates (stale points drawn on the new axes), so a
+    // trace without any T uncertainty still carries an all-zero error_x.
+    const fig = (errorBars, colorMode) =>
+      propertyFigure2d({
+        c: COLUMNS,
+        idx: all,
+        prop: PROP,
+        xVar: 'T',
+        colorMode,
+        errorBars,
+        logX: false,
+        logY: false,
+        theme: 'dark',
+        names: { cites: {} },
+        modelLabels: {},
+      });
+    for (const mode of ['other', 'substance', 'source_key']) {
+      const markers = fig(true, mode).data.filter((t) => t.type === 'scattergl');
+      expect(markers.length).toBeGreaterThan(0);
+      for (const t of markers) {
+        expect(t.error_x.visible).toBe(true);
+        expect(t.error_x.array).toEqual(t.x.map(() => 0));
+        expect(t.error_y.visible).toBe(true);
+        expect(t.error_y.array).toHaveLength(t.x.length);
+      }
+      for (const t of fig(false, mode).data.filter((t) => t.type === 'scattergl')) {
+        expect(t.error_x).toBeUndefined();
+        expect(t.error_y).toBeUndefined();
+      }
+    }
+  });
+
   it('colors model curves on the data scale and fades them outside the model range', () => {
     const curves = [
       { model: 'm', fixed: 100, x: [250, 260, 270], y: [1, 2, 3], in_range: [false, true, true] },
