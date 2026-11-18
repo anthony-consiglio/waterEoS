@@ -10,18 +10,19 @@
 
 ## Overview
 
-**waterEoS** is a Rust-accelerated Python package for computing thermodynamic and transport properties of supercooled water. It implements six supercooled-water equation-of-state models &mdash; Holten (2014), Caupin (2019), Duška (2020), Shi & Tanaka (2020), Grenke (2025), and Singh (2017) &mdash; and provides pass-through access to SeaFreeze `water1` and IAPWS-95, all under a single [SeaFreeze](https://github.com/Bjournaux/SeaFreeze)-compatible API.
+**waterEoS** is a Python package for calculating the thermodynamic and transport properties of water. Its [SeaFreeze-compatible API](https://github.com/Bjournaux/SeaFreeze) provides equations of state for supercooled water, including models constrained by amorphous-water measurements, alongside liquid-water and vapor reference models.
 
 ### Two-state equations of state
 
-Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich). waterEoS implements four such models:
+Liquid water's thermodynamic anomalies (density maximum, diverging compressibility and heat capacity upon supercooling) can be explained by treating water as a mixture of two interconvertible local structures: a high-density, disordered structure (state A) and a low-density, tetrahedral structure (state B). These "two-state" models predict a liquid-liquid critical point (LLCP) deep in the supercooled regime, below which water can separate into two distinct liquid phases (HDL-rich and LDL-rich).
 
+- **Bridge29 (Tony Consiglio)** connects liquid and amorphous water through a two-state Gibbs energy. The low-density state is referenced to ice Ih, and the high-density state includes a liquid–vapor stability limit. The model predicts a liquid–liquid critical point at 222.34 K and 47.65 MPa. A separate dynamic fraction governs viscosity, self-diffusion, and rotational relaxation. [Python example](#bridge29-thermodynamics-and-transport)
 - **Holten, Sengers & Anisimov (2014)** -- The foundational two-state EOS for supercooled water. Uses a Gibbs-energy (pressure-additive) mixing rule, fitted to experimental data at positive pressures up to 400 MPa. Places the LLCP at 228 K, 0 MPa.
 - **Caupin & Anisimov (2019)** -- Extends the two-state framework to negative pressures (stretched water), connecting the liquid-liquid spinodal to the liquid-vapor spinodal in a unified description. Places the LLCP at 218 K, 72 MPa. An optional `caupin2019_kim` variant uses the with-Kim parameter set from Table II of the same paper, which incorporates the Kim et al. (2017) X-ray scattering data and places the LLCP at 219 K, 59 MPa.
 - **Duska (2020)** -- Uses a volume-additive mixing rule (rather than Gibbs-energy mixing), yielding an explicit equation of state in volume and temperature ("EOS-VaT"). Fitted over a broader temperature range up to 370 K. Places the LLCP at 221 K, 54 MPa.
 - **Shi & Tanaka (2020)** -- A hierarchical two-state EOS in which the order parameter is built from a coarse-grained "locally favored structure" fraction. Reproduces the IAPWS-95 liquid surface to ~0.05% in density and places the LLCP well below experimentally accessible temperatures, at 184 K, 173 MPa, so that the observed anomalies are attributed to the two-state feature itself rather than proximity to the critical point.
 
-All four return 43 thermodynamic properties: 15 mixture properties, 14 per state (A and B), plus the tetrahedral fraction *x*.
+These models return the equilibrium low-density fraction `x`, mixture properties, and properties of the individual high- and low-density states.
 
 ### Additional models
 
@@ -34,13 +35,13 @@ All four return 43 thermodynamic properties: 15 mixture properties, 14 per state
 
 ## Web App
 
-Try waterEoS interactively at **[watereos-visualizer.up.railway.app](https://watereos-visualizer.up.railway.app)**
+To see Bridge29, open **EoS Phase Diagram** and select **Bridge29 (Consiglio)** in the model menu. **Property Explorer** plots its isobars and isotherms, and **Point Calculator** reports both the equilibrium and dynamic fractions at a specified temperature and pressure. [Open the waterEoS visualizer](https://watereos-visualizer.up.railway.app)
 
 The web app includes a Property Explorer, an EoS phase diagram viewer (per two-state model, 100&ndash;375 K and &minus;400 to 420 MPa: liquid-liquid coexistence, critical point and stability limits, Widom line, liquid-vapor stability limit and coexistence, homogeneous nucleation, model melting lines of ices Ih, III and V, maxima and minima of density, compressibility, sound speed and heat capacity, and measured reference points), an **H₂O + NaCl phase diagram** atlas (the phase equilibria of water and its NaCl solutions in pressure, temperature, specific volume and composition, from 1 Pa to 400 MPa above 229 K: liquid, ices Ih, II, III, V and VI, and vapor; isothermal, isobaric, isochoric and isoplethal sections, the same sections as surfaces, the equilibrium complex in 3-D and the convex-hull construction it comes from; at zero NaCl the diagrams are those of pure water), a measured-data browser, a model comparison tool, and a point calculator.
 
 <p align="center">
   <img src="docs/info_hero.png" alt="waterEoS web app" width="700"><br>
-  <em>The waterEoS web app — a unified toolkit for ten equation-of-state models.</em>
+  <em>The waterEoS visualizer.</em>
 </p>
 
 <p align="center">
@@ -65,6 +66,12 @@ pip install waterEoS
 ```
 
 Pre-built wheels for Linux (x86_64, aarch64), macOS (Intel, Apple Silicon), and Windows include the compiled Rust backend automatically. On other platforms, pip installs from source with a pure Python fallback.
+
+To use the revision that introduced Bridge29, install directly from GitHub. Building the native extension from source requires a Rust toolchain.
+
+```bash
+python -m pip install "waterEoS @ git+https://github.com/anthony-consiglio/waterEoS.git@a54b7c5264ffa906810421cd4c098189fc157acd"
+```
 
 ## Quick Start
 
@@ -293,14 +300,11 @@ The Gibbs energy determines the equilibrium LDL fraction `x`. A separate dynamic
 ```python
 from watereos import list_models
 print(list_models())
-# ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
-#  'bridge29', 'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
-#  'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor']
 ```
 
 ## Output Properties
 
-All models return an object with the following attributes (the three two-state models also include `x`, `_A`, and `_B` suffixed properties; `grenke2025` returns only the mixture properties):
+The available properties depend on the model. Two-state equations include the fraction `x` and use `_A` and `_B` for the pure-state properties.
 
 ### Mixture (equilibrium) properties
 
@@ -328,20 +332,22 @@ Each property above (except `x`) is also available for the individual states wit
 - `rho_A`, `Cp_A`, `vel_A`, ... (State A: high-density / disordered)
 - `rho_B`, `Cp_B`, `vel_B`, ... (State B: low-density / tetrahedral)
 
-**Total: 43 output properties** (15 mixture + 14 state A + 14 state B).
+Bridge29 returns `NaN` for `Kp`, `Kp_A`, and `Kp_B`.
 
 All thermodynamic potentials (S, G, H, U, A) are aligned to the IAPWS-95 reference state.
 
-### Transport properties (`singh2017` only)
+### Transport properties
+
+Bridge29, the Singh transport models, and `shi_tanaka2020_transport` provide the following quantities.
 
 | Attribute | Property | Units |
 |-----------|----------|-------|
 | `eta` | Dynamic viscosity | Pa·s |
 | `D` | Self-diffusion coefficient | m²/s |
 | `tau_r` | Rotational correlation time | s |
-| `f` | LDS fraction (= `x` from Holten backbone) | -- |
+| `f` | Low-density fraction used in the transport model | -- |
 
-The `singh2017` model also returns all Holten (2014) thermodynamic properties listed above.
+For `singh2017`, `f` comes from the Holten equilibrium fraction. For `bridge29`, `f` has its own temperature and pressure dependence. At 250 K and 0.1 MPa, Bridge29 gives `x = 0.19864` and `f = 0.07328`.
 
 ## Phase Diagram
 
@@ -576,6 +582,8 @@ Every model's sources, with DOIs, are listed in `watereos/references.py` (`MODEL
 9. W. Wagner, T. Riethmann, R. Feistel, and A. H. Harvey, "New Equations for the Sublimation Pressure and Melting Pressure of H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **40**, 043103 (2011). [doi:10.1063/1.3657937](https://doi.org/10.1063/1.3657937) -- IAPWS R14-08 sublimation pressure correlation (`vapor_eos.sublimation_pressure`), drawn as the Ice Ih/vapor reference curve below 273.16 K in the H₂O phase diagram.
 
 10. R. Feistel and W. Wagner, "A New Equation of State for H₂O Ice Ih," *J. Phys. Chem. Ref. Data* **35**, 1021 (2006). [doi:10.1063/1.2183324](https://doi.org/10.1063/1.2183324) -- IAPWS R10-06 Gibbs function of ice Ih, used for the ice Ih melting line of the EoS phase diagram.
+
+11. Tony Consiglio, “Bridging liquid and amorphous water with a broadly constrained equation of state and a transport model,” manuscript in preparation.
 
 ## Authors
 
