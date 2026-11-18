@@ -61,8 +61,9 @@ const SEAFREEZE_NOTE = (
       SeaFreeze
     </a>{' '}
     project. The H₂O Phase Diagram tab draws water + NaCl with the Holten et al. (2014) liquid, the
-    SeaFreeze ices Ih–VI, the waterEoS vapor and an osmotic virial solution model; its figures are
-    computed with cryo-isochoric, and its Notes give the model of each figure.
+    SeaFreeze ices Ih–VI, a provisional Gibbs function of hydrohalite (NaCl·2H₂O), the waterEoS
+    vapor and an osmotic virial solution model; its figures are computed with cryo-isochoric, and
+    its Notes give the model of each figure.
   </>
 );
 

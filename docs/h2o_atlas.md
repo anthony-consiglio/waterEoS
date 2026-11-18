@@ -7,8 +7,13 @@ from. At zero NaCl the diagrams are those of pure water; the tab opens on the is
 p–T diagram of water. The atlas's process view (the isochoric chamber) is not part of the tab.
 
 Range: T above 229.2 K (the liquid–liquid critical point of the Holten 2014 liquid), 1 Pa to 400 MPa, ices Ih, II,
-III, V and VI, vapor, and NaCl up to 22 wt % (the fitted range of the solution model, 4.83 mol/kg). Composition is
-shown in wt % (what is computed), mol %, mol/kg or vol %.
+III, V and VI, vapor, and hydrohalite (NaCl·2H₂O, 61.9 wt %). The liquid's solution model is fitted to 4.83 mol/kg
+(22 wt %) and extrapolated to 6.37 mol/kg (27.1 wt %) so that it reaches the hydrohalite saturation everywhere; below
+the eutectic (−21.1 °C at 1 atm) the stable assemblage is ice + hydrohalite. Hydrohalite is provisional: its Gibbs
+function is fitted to its 1-atm solubility, with the crystal's volume, and checked against its solubility to 300 MPa
+and the ice + hydrohalite eutectic to 91 MPa (cryo-isochoric, docs/hydrohalite.md). Halite (above 0.1 °C) and
+2NaCl·17H₂O (along the eutectic above about 121 MPa) are not modeled. Composition is shown in wt % (what is
+computed), mol %, mol/kg or vol %.
 
 ## How the pieces fit
 

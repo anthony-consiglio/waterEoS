@@ -434,6 +434,13 @@ function Card({ card, info: s, solute, unit, manifest }) {
             v={s.liquid + (s.liquid === 'holten2014' ? ', T > ' + celsius(s.T_min) + ' °C' : '')}
           />
           <Row k="ices" v={s.ices.join(', ') + ' (SeaFreeze)'} />
+          {(s.hydrates || []).map((h) => (
+            <Row
+              key={h.name}
+              k="hydrate"
+              v={`${h.name} (${h.formula}, ${(100 * h.W).toFixed(1)} wt %): ${h.note}`}
+            />
+          ))}
           <Row
             k="vapor"
             v={
