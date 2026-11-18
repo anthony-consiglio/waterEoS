@@ -9,7 +9,7 @@
 //!   disc = 1 - 2*th/coop
 
 use numpy::ndarray::Array1;
-use numpy::{IntoPyArray, PyArrayMethods, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -766,6 +766,11 @@ fn compute_binodal_impl<M: PhaseMath>(
 // ═══════════════════════════════════════════════════════════════════════════
 // PyO3 wrappers — Spinodal
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// Arrays are read through `as_array()`, which accepts any memory layout.
+// `to_vec()` and `as_slice()` reject a strided view such as `path[:, 1]`, and
+// a panic here aborts the interpreter because the release profile sets
+// `panic = "abort"`.
 
 #[pyfunction]
 pub fn compute_spinodal_caupin<'py>(
@@ -774,7 +779,7 @@ pub fn compute_spinodal_caupin<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let p = p_arr.to_vec().unwrap_or_else(|_| p_arr.as_slice().unwrap().to_vec());
+    let p = p_arr.as_array().to_vec();
     let result = compute_spinodal_impl::<CaupinPhase>(&p, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -786,7 +791,7 @@ pub fn compute_spinodal_caupin_kim<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let p = p_arr.to_vec().unwrap_or_else(|_| p_arr.as_slice().unwrap().to_vec());
+    let p = p_arr.as_array().to_vec();
     let result = compute_spinodal_impl::<CaupinKimPhase>(&p, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -798,7 +803,7 @@ pub fn compute_spinodal_holten<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let p = p_arr.to_vec().unwrap_or_else(|_| p_arr.as_slice().unwrap().to_vec());
+    let p = p_arr.as_array().to_vec();
     let result = compute_spinodal_impl::<HoltenPhase>(&p, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -810,7 +815,7 @@ pub fn compute_spinodal_duska<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let p = p_arr.to_vec().unwrap_or_else(|_| p_arr.as_slice().unwrap().to_vec());
+    let p = p_arr.as_array().to_vec();
     let result = compute_spinodal_impl::<DuskaPhase>(&p, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -828,13 +833,9 @@ pub fn compute_binodal_caupin<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.to_vec().unwrap_or_else(|_| spin_p.as_slice().unwrap().to_vec());
-    let tu = spin_t_upper
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_upper.as_slice().unwrap().to_vec());
-    let tl = spin_t_lower
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_lower.as_slice().unwrap().to_vec());
+    let sp = spin_p.as_array().to_vec();
+    let tu = spin_t_upper.as_array().to_vec();
+    let tl = spin_t_lower.as_array().to_vec();
     let result = compute_binodal_impl::<CaupinPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -848,13 +849,9 @@ pub fn compute_binodal_caupin_kim<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.to_vec().unwrap_or_else(|_| spin_p.as_slice().unwrap().to_vec());
-    let tu = spin_t_upper
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_upper.as_slice().unwrap().to_vec());
-    let tl = spin_t_lower
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_lower.as_slice().unwrap().to_vec());
+    let sp = spin_p.as_array().to_vec();
+    let tu = spin_t_upper.as_array().to_vec();
+    let tl = spin_t_lower.as_array().to_vec();
     let result = compute_binodal_impl::<CaupinKimPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -868,13 +865,9 @@ pub fn compute_binodal_holten<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.to_vec().unwrap_or_else(|_| spin_p.as_slice().unwrap().to_vec());
-    let tu = spin_t_upper
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_upper.as_slice().unwrap().to_vec());
-    let tl = spin_t_lower
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_lower.as_slice().unwrap().to_vec());
+    let sp = spin_p.as_array().to_vec();
+    let tu = spin_t_upper.as_array().to_vec();
+    let tl = spin_t_lower.as_array().to_vec();
     let result = compute_binodal_impl::<HoltenPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
@@ -888,13 +881,9 @@ pub fn compute_binodal_duska<'py>(
     t_llcp: f64,
     p_llcp: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let sp = spin_p.to_vec().unwrap_or_else(|_| spin_p.as_slice().unwrap().to_vec());
-    let tu = spin_t_upper
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_upper.as_slice().unwrap().to_vec());
-    let tl = spin_t_lower
-        .to_vec()
-        .unwrap_or_else(|_| spin_t_lower.as_slice().unwrap().to_vec());
+    let sp = spin_p.as_array().to_vec();
+    let tu = spin_t_upper.as_array().to_vec();
+    let tl = spin_t_lower.as_array().to_vec();
     let result = compute_binodal_impl::<DuskaPhase>(&sp, &tu, &tl, t_llcp, p_llcp);
     result.to_py_dict(py)
 }
