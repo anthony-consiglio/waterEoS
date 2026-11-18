@@ -670,7 +670,7 @@ function MeasuredDataScreen({ release }) {
                 reset
               </button>
             </div>
-            {CATEGORY_FILTERS.map(({ key, label }) => (
+            {CATEGORY_FILTERS.map(({ key, label, search }) => (
               <details
                 key={key}
                 className="md-filter-group"
@@ -687,6 +687,7 @@ function MeasuredDataScreen({ release }) {
                   checked={(v) => !filters.exclude[key].includes(v)}
                   onToggle={(v, on) => setExclude(key, [v], !on)}
                   onSet={(vs, on) => setExclude(key, vs, !on)}
+                  search={!!search}
                   maxHeight={180}
                 />
               </details>

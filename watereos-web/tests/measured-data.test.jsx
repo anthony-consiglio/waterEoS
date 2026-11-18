@@ -261,3 +261,17 @@ describe('measured-data helpers', () => {
     expect(inNoMansLand(LINES, 260, 50)).toBe(false);
   });
 });
+
+describe('method filter', () => {
+  it('hides rows by measurement method', () => {
+    const c = { ...COLUMNS, method: ['DDM', 'DDM', 'Brillouin scattering', 'viscometer'] };
+    const all = [0, 1, 2, 3];
+    const base = {
+      ...DEFAULT_FILTERS,
+      exclude: { ...DEFAULT_FILTERS.exclude, substance: [], data_type: [] },
+    };
+    expect(
+      applyFilters(c, all, { ...base, exclude: { ...base.exclude, method: ['DDM'] } })
+    ).toEqual([2, 3]);
+  });
+});

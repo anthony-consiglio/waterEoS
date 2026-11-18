@@ -147,6 +147,16 @@ PROPERTY_LABELS = {
     'structural_relaxation_time': 'Structural relaxation time τ',
     'tetrahedral_fraction': 'Tetrahedral fraction',
     'tetrahedral_fraction_proxy': 'X-ray tetrahedral-fraction proxy (1 − g_OO)',
+    'bulk_viscosity': 'Bulk viscosity η_b',
+    'bulk_to_shear_viscosity_ratio': 'Bulk-to-shear viscosity ratio η_b/η',
+    'viscoelastic_relaxation_time': 'Structural relaxation time τ_P (viscoelastic, constant pressure)',
+    'probe_diffusion_coefficient': 'Colloidal-probe diffusion coefficient (tracer, not self-diffusion)',
+    'brillouin_frequency_shift': 'Brillouin frequency shift Δf_B',
+    'brillouin_linewidth': 'Brillouin linewidth Γ_B (half width)',
+    'sound_attenuation_over_frequency_squared': 'Sound attenuation α/f²',
+    'infinite_frequency_bulk_modulus': 'Infinite-frequency bulk modulus K∞',
+    'relaxational_bulk_modulus': 'Relaxational bulk modulus K_r = K∞ − K₀',
+    'infinite_frequency_shear_modulus': 'Infinite-frequency shear modulus G∞',
 }
 
 # Loci: the value repeats T_K (LOCUS_T) or P_MPa (LOCUS_P); they are drawn in

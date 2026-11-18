@@ -8,6 +8,7 @@ export const CATEGORY_FILTERS = [
   { key: 'state', label: 'State' },
   { key: 'sample', label: 'Sample' },
   { key: 'qc_flag', label: 'QC flag' },
+  { key: 'method', label: 'Method', search: true },
 ];
 
 export const DEFAULT_FILTERS = {
@@ -18,6 +19,7 @@ export const DEFAULT_FILTERS = {
     state: [],
     sample: [],
     qc_flag: [],
+    method: [],
   },
   sources: [], // included source keys; empty = every source
   fits: [], // fit tokens (or 'none'); empty = no restriction
