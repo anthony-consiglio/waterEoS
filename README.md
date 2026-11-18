@@ -545,16 +545,19 @@ these outputs; `grenke2025`, `water1`, and `IAPWS95` do not.
 <summary><strong>Which backend am I using (Rust or Python)?</strong></summary>
 
 The Rust backend is selected automatically when the compiled extension
-is available (included in pre-built PyPI wheels). To check:
+is available (included in pre-built PyPI wheels). It covers the two-state
+models `bridge29`, `holten2014`, `caupin2019`, `caupin2019_kim`,
+`duska2020` and `shi_tanaka2020`, water vapor, and the SeaFreeze ice
+phases. To check:
 
 ```python
-from watereos import compute
-out = compute(273.15, 0.1, 'duska2020')
-# If using Rust, computation is 2-5x faster; no visible difference in output
+from watereos import backend
+backend('bridge29')  # 'rust', or 'numpy' without the extension
+backend()            # every backend-aware model
 ```
 
 If you installed from source without a Rust toolchain, the pure Python
-fallback is used. Results are identical; only speed differs.
+fallback is used. The two backends agree to rounding; only speed differs.
 </details>
 
 ## References
