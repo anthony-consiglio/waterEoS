@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import EoSPhaseDiagram from '../src/screens/EoSPhaseDiagram.jsx';
+import { DEFAULT_SHOW, DEFAULT_RANGES } from '../src/screens/eosPhaseLayers.js';
 import { ThemeProvider } from '../src/theme/ThemeContext.jsx';
 import { SettingsProvider } from '../src/settings/SettingsContext.jsx';
 import * as client from '../src/api/client.js';
@@ -59,8 +60,31 @@ describe('EoSPhaseDiagram screen', () => {
     );
     // Non-phase-diagram model NOT in select
     expect(screen.queryByRole('option', { name: 'IAPWS-95' })).not.toBeInTheDocument();
-    // At least one overlay checkbox label
-    expect(screen.getByText('Binodal')).toBeInTheDocument();
+    // Overlay groups and checkboxes; the Kauzmann line is the only layer off by default
+    expect(screen.getByText('Liquid–liquid transition')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Coexistence line' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Ice V melting' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Kauzmann line' })).not.toBeChecked();
     expect(document.querySelector('.plot-card')).toBeInTheDocument();
+  });
+
+  it('asks for every default layer on the standard window', async () => {
+    vi.spyOn(client, 'fetchMetadata').mockResolvedValue({
+      models: [],
+      properties: {},
+      units: { options: {}, defaults: {}, category_labels: {} },
+    });
+    const spy = vi.spyOn(client, 'fetchEosPhase').mockResolvedValue({
+      figure: { data: [], layout: {} },
+      warnings: [],
+    });
+    render(wrap(<EoSPhaseDiagram />));
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const body = spy.mock.calls[0][0];
+    expect(body.model).toBe('caupin2019');
+    expect(body.show).toEqual(DEFAULT_SHOW);
+    expect(body.show).not.toContain('kauzmann');
+    expect(body.T_range).toEqual([DEFAULT_RANGES.Tmin, DEFAULT_RANGES.Tmax]);
+    expect(body.P_range).toEqual([DEFAULT_RANGES.Pmin, DEFAULT_RANGES.Pmax]);
   });
 });

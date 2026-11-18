@@ -1,6 +1,8 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, conlist
 
+from watereos.eos_phase_diagram import DEFAULT_LAYERS as EOS_DEFAULT_LAYERS
+
 Theme = Literal["dark", "light"]
 Pair = conlist(float, min_length=2, max_length=2)
 
@@ -64,8 +66,10 @@ class CompareRequest(_StrictModel):
 
 class EosPhaseRequest(_StrictModel):
     model: str
+    # Layer keys of watereos.eos_phase_diagram.LAYERS (older names are
+    # accepted through LAYER_ALIASES; unknown keys are ignored).
     show: conlist(str, min_length=1) = Field(
-        default_factory=lambda: ["binodal", "hdl_spinodal", "ldl_spinodal", "LLCP"])
+        default_factory=lambda: list(EOS_DEFAULT_LAYERS))
     auto_limits: bool = True
     T_range: Optional[Pair] = None
     P_range: Optional[Pair] = None

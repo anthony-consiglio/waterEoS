@@ -1,8 +1,13 @@
 import time
 from fastapi.testclient import TestClient
 from watereos_api.app import create_app
+from watereos.eos_phase_diagram import DEFAULT_LAYERS, LAYERS, PLOT_P_RANGE, T_RANGE
 
 client = TestClient(create_app())
+
+
+def _names(fig):
+    return {str(t.get("name", "")) for t in fig["data"]}
 
 
 def test_eos_phase_returns_requested_curves():
@@ -12,9 +17,19 @@ def test_eos_phase_returns_requested_curves():
         "theme": "dark"})
     assert r.status_code == 200
     fig = r.json()["figure"]
-    names = " ".join(str(t.get("name", "")) for t in fig["data"]).lower()
-    assert "binodal" in names and "spinodal" in names
+    assert _names(fig) == {LAYERS[k] for k in ("binodal", "hdl_spinodal", "ldl_spinodal", "LLCP")}
     assert any(t.get("mode") == "markers" for t in fig["data"])  # LLCP
+    assert any("critical point" in a["text"] for a in fig["layout"]["annotations"])
+
+
+def test_eos_phase_default_shows_every_layer_but_kauzmann():
+    r = client.post("/api/figures/eos-phase-diagram", json={"model": "caupin2019", "theme": "light"})
+    assert r.status_code == 200
+    fig = r.json()["figure"]
+    names = _names(fig)
+    assert {LAYERS[k] for k in DEFAULT_LAYERS} <= names
+    assert LAYERS["kauzmann"] not in names
+    assert "Caupin and Anisimov (2019)" in fig["layout"]["title"]["text"]
 
 
 def test_eos_phase_cached_second_call_faster_and_identical():
@@ -34,16 +49,19 @@ def test_eos_phase_unknown_model_404():
     assert r.status_code == 404
 
 
-def test_eos_phase_triple_point_for_ice_ih_only():
+def test_eos_phase_model_without_phase_diagram_404():
+    r = client.post("/api/figures/eos-phase-diagram",
+                    json={"model": "water1", "show": ["binodal"]})
+    assert r.status_code == 404
+
+
+def test_eos_phase_accepts_older_layer_names():
+    # The Info page hero still asks for these.
     r = client.post("/api/figures/eos-phase-diagram", json={
-        "model": "duska2020", "show": ["ice_ih"], "theme": "dark"})
+        "model": "duska2020", "show": ["tmd", "nuc_ih", "nuc_iii", "ice_ih"], "theme": "dark"})
     assert r.status_code == 200
-    fig = r.json()["figure"]
-    triple = [t for t in fig["data"] if t.get("name") == "Triple point"]
-    assert len(triple) == 1
-    assert triple[0].get("mode") == "markers"
-    # square marker (matches Dash _CURVE_STYLES triple-point symbol)
-    assert triple[0]["marker"]["symbol"] == "square"
+    names = _names(r.json()["figure"])
+    assert {LAYERS["density"], LAYERS["nucleation"], LAYERS["ice_ih"]} <= names
 
 
 def test_eos_phase_axis_clamp_when_auto_limits_false():
@@ -53,8 +71,8 @@ def test_eos_phase_axis_clamp_when_auto_limits_false():
     fig = client.post("/api/figures/eos-phase-diagram", json=body).json()["figure"]
     assert list(fig["layout"]["xaxis"]["range"]) == [230, 280]
     assert list(fig["layout"]["yaxis"]["range"]) == [50, 150]
-    # auto_limits=True (default) should NOT set explicit ranges
+    # auto_limits=True (default) keeps the diagram's standard window.
     body2 = {"model": "duska2020", "show": ["binodal"], "theme": "dark"}
     fig2 = client.post("/api/figures/eos-phase-diagram", json=body2).json()["figure"]
-    # the xaxis dict may not have a 'range' key at all
-    assert "range" not in fig2["layout"].get("xaxis", {})
+    assert list(fig2["layout"]["xaxis"]["range"]) == list(T_RANGE)
+    assert list(fig2["layout"]["yaxis"]["range"]) == list(PLOT_P_RANGE)

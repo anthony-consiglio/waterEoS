@@ -4,6 +4,7 @@ from watereos_api.serialization import figure_to_jsonable
 from watereos_api import figures
 from watereos_api.cache import memoize
 from watereos.model_registry import MODEL_REGISTRY
+from watereos.eos_phase_diagram import MODELS as EOS_PHASE_MODELS
 
 router = APIRouter(prefix="/figures")
 
@@ -65,6 +66,8 @@ def compare(req: CompareRequest):
 @router.post("/eos-phase-diagram")
 def eos_phase(req: EosPhaseRequest):
     _check_model(req.model)
+    if req.model not in EOS_PHASE_MODELS:
+        raise HTTPException(status_code=404, detail=f"no EoS phase diagram for model: {req.model}")
 
     def _build():
         fig = figures.build_eos_phase_figure(
