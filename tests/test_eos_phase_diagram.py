@@ -62,10 +62,16 @@ def test_liquid_liquid_lines_match_the_per_pressure_solution(model):
     p = np.linspace(pc + 3.0, 400.0, 300)
     spinodal = m['spinodal'](p)
     binodal = m['binodal'](p, spinodal=spinodal)
-    P, upper = np.asarray(spinodal['p_array']), np.asarray(spinodal['T_upper'])
     for path in d['ldl_limit']:
-        sel = (path[:, 1] > pc + 3.0) & (path[:, 1] < 399.0)
-        assert np.abs(path[sel, 0] - np.interp(path[sel, 1], P, upper)).max() < 0.01
+        # Past its pressure maximum the line turns back (Local26), and the
+        # solver gives the warmer root. Next to the maximum the two roots are
+        # closer than the solver's temperature grid, and it may find none.
+        path = path[:np.argmax(path[:, 1]) + 1]
+        path = path[(path[:, 1] > pc + 3.0) & (path[:, 1] < 399.0)]
+        expected = np.asarray(m['spinodal'](np.ascontiguousarray(path[:, 1]))['T_upper'])
+        found = np.isfinite(expected)
+        assert found.sum() > 0.9 * len(path) > 50
+        assert np.abs(path[found, 0] - expected[found]).max() < 0.01
     bt, bp = np.asarray(binodal['T_K']), np.asarray(binodal['p_MPa'])
     ok = np.isfinite(bt) & (bp > pc + 3.0) & (bt > epd.T_RANGE[0] + 0.5)   # inside the plotted window
     traced = d['binodal'][d['binodal'][:, 0] > bt[ok].min() - 1.0]   # the branch the solver follows

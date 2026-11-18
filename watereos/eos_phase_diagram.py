@@ -56,6 +56,9 @@ ATM_PRESSURE = 0.101325  # MPa
 MODELS = {
     'bridge29': ('Bridge29 (Tony Consiglio)',
                  'The low-temperature liquid branches are continuations constrained by amorphous-water data.'),
+    'local26': ('Local26 (Tony Consiglio)',
+                'Bridge29 refitted to liquid water at 175–300 K and −50 to 250 MPa. '
+                'Curves outside that window are extrapolations.'),
     'caupin2019': (
         'Caupin and Anisimov (2019), corrected Table III',
         'The published fit uses data up to 300 K. Curves outside its fitted range are extrapolations.'),
@@ -121,8 +124,9 @@ def _model(model_key):
             binodal=functools.partial(phase_diagram.compute_binodal_curve, pset=pset),
             lv_spinodal=lambda T: core.spinodal_pressure(T, pset=pset)[0],
             p_min=P_RANGE[0])
-    if model_key == 'bridge29':
-        from .bridge29 import core, phase
+    if model_key in ('bridge29', 'local26'):
+        core = importlib.import_module(f'watereos.{model_key}.core')
+        phase = importlib.import_module(f'watereos.{model_key}.phase')
         return dict(batch=core.compute_batch, find_llcp=phase.find_LLCP,
                     spinodal=phase.compute_spinodal_curve, binodal=phase.compute_binodal_curve,
                     liquid_lines=functools.partial(phase.liquid_lines, T_RANGE[0], P_RANGE[1]),

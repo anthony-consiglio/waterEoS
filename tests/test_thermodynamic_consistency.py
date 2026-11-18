@@ -6,7 +6,7 @@ energy must be the potential of the returned entropy and volume,
 
 on every liquid branch and in every backend.
 
-Holten (2014), Caupin (2019) and Bridge29 are written as explicit Gibbs
+Holten (2014), Caupin (2019), Bridge29 and Local26 are written as explicit Gibbs
 energies, so the identities hold by construction; they are checked here as
 a guard.
 Duska (2020) defines state A through its volume and entropy, and its Gibbs
@@ -23,17 +23,19 @@ import importlib
 import numpy as np
 import pytest
 
-MODELS = ['holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'bridge29']
+MODELS = ['holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'bridge29',
+          'local26']
 BRANCHES = ['stable', 'hdl', 'ldl']
 
 _PACKAGE = {'holten2014': 'holten_eos', 'caupin2019': 'caupin_eos',
             'caupin2019_kim': 'caupin_eos', 'duska2020': 'duska_eos',
-            'bridge29': 'watereos.bridge29'}
+            'bridge29': 'watereos.bridge29', 'local26': 'watereos.local26'}
 _RUST_NAME = {'holten2014': 'compute_batch_holten',
               'caupin2019': 'compute_batch_caupin',
               'caupin2019_kim': 'compute_batch_caupin_kim',
               'duska2020': 'compute_batch_duska',
-              'bridge29': 'compute_batch_bridge29'}
+              'bridge29': 'compute_batch_bridge29',
+              'local26': 'compute_batch_local26'}
 
 # Finite-difference steps (five-point stencil) and tolerances.  With these
 # steps the truncation and rounding errors of the stencil are below
@@ -138,7 +140,9 @@ def test_gibbs_energy_is_the_potential_of_S_and_V(model, branch, backend):
     assert ok.sum() > 150
     assert T[ok].min() < 185.0
     if branch != 'ldl':
-        assert T[ok].max() == 320.0 and P[ok].max() == 400.0
+        # Local26's high-density state ends at 302.4 K (see test_local26.py).
+        assert T[ok].max() == (300.0 if model == 'local26' else 320.0)
+        assert P[ok].max() == 400.0
         assert np.any(ok & (T == 244.05))
     i = np.argmax(np.abs(res_S[ok]))
     assert np.abs(res_S[ok]).max() < S_ATOL, (
