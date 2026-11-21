@@ -10,7 +10,7 @@ use numpy::PyReadonlyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::bridge29::{compute_batch, Equation, Model, Thermodynamics};
+use crate::bridge29::{compute_batch, Equation, Model, Spinodal, Thermodynamics};
 
 /// watereos/data/local26.json. The low-density oscillator (n_L) and the
 /// 500 K high-density oscillator (n_H2) are fixed at zero.
@@ -27,10 +27,12 @@ const LOCAL26: Model = Model {
         n_h0: 1.9844386652707942,
         n_h2: 0.0,
         n_h3: 11.244722205965632,
-        ps: [-22.430957302895475, 8.39848165168045, -0.7241029777904431],
-        vs: [0.11150299806339095, 0.00627605596647058, 0.001970415582952441],
-        ph: [1.872737285122753, -2.102826114384249, 0.2638401163436146],
-        cs: [-1.12155933280279, 5.384518995048788, -0.8680318890521439],
+        spinodal: Spinodal::Chebyshev {
+            ps: [-22.430957302895475, 8.39848165168045, -0.7241029777904431],
+            vs: [0.11150299806339095, 0.00627605596647058, 0.001970415582952441],
+            ph: [1.872737285122753, -2.102826114384249, 0.2638401163436146],
+            cs: [-1.12155933280279, 5.384518995048788, -0.8680318890521439],
+        },
         e_x: 4558.513223040699,
         v_x: 0.22273837392716844,
         lg_x: 2.5521790995741447,

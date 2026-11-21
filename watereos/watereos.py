@@ -5,6 +5,7 @@ Provides a single ``getProp(PT, model)`` interface that dispatches to:
 
   - ``'bridge29'``       -- Consiglio, liquid and amorphous water with transport
   - ``'local26'``        -- Consiglio, Bridge29 refitted to 175-300 K, -50 to 250 MPa
+  - ``'bridge37'``       -- Consiglio, Bridge29 with quartic spinodal functions, refitted
   - ``'water1'``         -- SeaFreeze water1
   - ``'IAPWS95'``        -- SeaFreeze IAPWS-95
   - ``'holten2014'``     -- Holten, Sengers & Anisimov (2014)
@@ -38,7 +39,7 @@ from watereos.two_state_branch import normalize_branch
 _MODEL_WATERS = model_water_keys()
 
 _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
-           'duska2020', 'bridge29', 'local26', 'grenke2025', 'singh2017',
+           'duska2020', 'bridge29', 'local26', 'bridge37', 'grenke2025', 'singh2017',
            'singh2017_caupin2019', 'singh2017_duska2020',
            'shi_tanaka2020', 'shi_tanaka2020_transport', 'vapor',
            'moynihan1996species', 'mishima2023equation'] + pcsaft_keys() + _MODEL_WATERS
@@ -49,7 +50,7 @@ _MODELS = ['water1', 'IAPWS95', 'holten2014', 'caupin2019', 'caupin2019_kim',
 # keys that support it are looked up in model_water_eos when needed, which
 # keeps that package out of the import of watereos.
 _BRANCH_MODELS = frozenset([
-    'bridge29', 'local26',
+    'bridge29', 'local26', 'bridge37',
     'holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020',
     'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
     'moynihan1996species',
@@ -171,8 +172,8 @@ def getProp(PT, model, branch='stable'):
 
     model : str
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
-        'caupin2019_kim', 'duska2020', 'bridge29', 'local26', 'shi_tanaka2020',
-        'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
+        'caupin2019_kim', 'duska2020', 'bridge29', 'local26', 'bridge37',
+        'shi_tanaka2020', 'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
         'singh2017_caupin2019', 'singh2017_duska2020', 'vapor',
         'moynihan1996species', 'mishima2023equation', or a model-water key.
         See ``list_models()`` for the complete list. Matching is case-insensitive.
@@ -189,7 +190,7 @@ def getProp(PT, model, branch='stable'):
         gives the smooth metastable extension of the liquid through
         the transition.
         Supported by 'holten2014', 'caupin2019', 'caupin2019_kim',
-        'duska2020', 'bridge29', 'local26', 'moynihan1996species', the
+        'duska2020', 'bridge29', 'local26', 'bridge37', 'moynihan1996species', the
         'singh2017*' transport models and the two-state model-water equations.
 
     Returns
@@ -242,6 +243,10 @@ def getProp(PT, model, branch='stable'):
 
     if canonical == 'local26':
         from watereos.local26 import getProp as _gp
+        return _gp(PT, branch=branch)
+
+    if canonical == 'bridge37':
+        from watereos.bridge37 import getProp as _gp
         return _gp(PT, branch=branch)
 
     if canonical == 'duska2020':
@@ -307,8 +312,8 @@ def compute(T_K, P_MPa, model, branch='stable'):
         Pressure(s) in MPa.
     model : str
         One of: 'water1', 'IAPWS95', 'holten2014', 'caupin2019',
-        'caupin2019_kim', 'duska2020', 'bridge29', 'local26', 'shi_tanaka2020',
-        'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
+        'caupin2019_kim', 'duska2020', 'bridge29', 'local26', 'bridge37',
+        'shi_tanaka2020', 'shi_tanaka2020_transport', 'grenke2025', 'singh2017',
         'singh2017_caupin2019', 'singh2017_duska2020', 'vapor',
         'moynihan1996species', 'mishima2023equation', or a model-water key.
         See ``list_models()`` for the complete list. Matching is case-insensitive.

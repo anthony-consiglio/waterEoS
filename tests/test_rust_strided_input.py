@@ -125,7 +125,7 @@ def _tp_points(n=200, t_range=(200.0, 320.0), p_range=(0.1, 300.0)):
 
 
 @pytest.mark.parametrize("name", ["caupin", "caupin_kim", "holten", "duska",
-                                  "bridge29", "local26", "shi_tanaka",
+                                  "bridge29", "local26", "bridge37", "shi_tanaka",
                                   "vapor"])
 def test_batch_accepts_strided_input(name):
     batch = getattr(watereos_rs, f"compute_batch_{name}")

@@ -6,9 +6,9 @@
 //! (Bridge29's coefficients and finite-barrier transport) and
 //! `watereos/bridge29/ice.py` (IAPWS-06 ice Ih reference of the
 //! low-density state). The equation takes its coefficients from a
-//! `Model`: `BRIDGE29` here, from `watereos/data/bridge29.json`, and
-//! `LOCAL26` in local26.rs. `tests/test_bridge29_rust.py` compares this
-//! backend with the NumPy one for both.
+//! `Model`: `BRIDGE29` here, from `watereos/data/bridge29.json`, `LOCAL26`
+//! in local26.rs and `BRIDGE37` in bridge37.rs. `tests/test_bridge29_rust.py`
+//! compares this backend with the NumPy one for all three.
 //!
 //! The NumPy core takes the second derivatives of the high-density state
 //! by a complex step through its analytic first derivatives. Here the same
@@ -60,13 +60,9 @@ pub struct Thermodynamics {
     pub n_h0: f64,
     pub n_h2: f64,
     pub n_h3: f64,
-    /// Chebyshev coefficients, in t = (T_eff - 200 K) / 100 K, of the
-    /// reduced spinodal pressure, spinodal volume, curvature and cubic
+    /// The reduced spinodal pressure, spinodal volume, curvature and cubic
     /// coefficient.
-    pub ps: [f64; 3],
-    pub vs: [f64; 3],
-    pub ph: [f64; 3],
-    pub cs: [f64; 3],
+    pub spinodal: Spinodal,
     pub e_x: f64,
     pub v_x: f64,
     pub lg_x: f64,
@@ -76,30 +72,61 @@ pub struct Thermodynamics {
     pub n_c: f64,
 }
 
-/// Coefficients of the equation, with the power series derived from the
-/// Chebyshev ones.
+/// The four spinodal functions of the high-density state, in one of the
+/// two bases of `watereos/bridge29/equation.py`.
+pub enum Spinodal {
+    /// Chebyshev quadratics in t = (T_eff - 200 K) / 100 K (Bridge29,
+    /// Local26).
+    Chebyshev { ps: [f64; 3], vs: [f64; 3], ph: [f64; 3], cs: [f64; 3] },
+    /// Bernstein quartics in u = (T_eff - 100 K) / 320 K (Bridge37).
+    Bernstein { ps: [f64; 5], vs: [f64; 5], ph: [f64; 5], cs: [f64; 5] },
+}
+
+/// Coefficients of the equation, with the spinodal functions as power
+/// series in t of degree 4 (the Chebyshev quadratics padded with zeros,
+/// which leave Horner's rule exact).
 pub struct Equation {
     q: Thermodynamics,
     rm: f64,
     oscillators: [(f64, f64); 3],
-    ps: [f64; 3],
-    vs: [f64; 3],
-    phi: [f64; 3],
-    cubic: [f64; 3],
-    ps_t: [f64; 2],
-    vs_t: [f64; 2],
-    phi_t: [f64; 2],
-    cubic_t: [f64; 2],
-    ivp: [f64; 5],
+    ps: [f64; 5],
+    vs: [f64; 5],
+    phi: [f64; 5],
+    cubic: [f64; 5],
+    ps_t: [f64; 4],
+    vs_t: [f64; 4],
+    phi_t: [f64; 4],
+    cubic_t: [f64; 4],
+    ivp: [f64; 9],
 }
 
 impl Equation {
     pub const fn new(q: Thermodynamics) -> Self {
-        let ps = cheb_to_poly(q.ps);
-        let vs = cheb_to_poly(q.vs);
-        let ps_t = poly_deriv(ps);
-        let phi = cheb_to_poly(q.ph);
-        let cubic = cheb_to_poly(q.cs);
+        let (ps, vs, phi, cubic, ivp) = match q.spinodal {
+            Spinodal::Chebyshev { ps, vs, ph, cs } => {
+                let (ps, vs) = (cheb_to_poly(ps), cheb_to_poly(vs));
+                let ps_t = [ps[1], 2.0 * ps[2]];
+                // Integral of VS * dPS/dt, zero at t = 0, as power-series
+                // coefficients.
+                let ivp = [
+                    0.0,
+                    vs[0] * ps_t[0],
+                    (vs[0] * ps_t[1] + vs[1] * ps_t[0]) / 2.0,
+                    (vs[1] * ps_t[1] + vs[2] * ps_t[0]) / 3.0,
+                    vs[2] * ps_t[1] / 4.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ];
+                (pad(ps), pad(vs), pad(cheb_to_poly(ph)), pad(cheb_to_poly(cs)), ivp)
+            }
+            Spinodal::Bernstein { ps, vs, ph, cs } => {
+                let (ps, vs) = (bernstein_to_poly(ps), bernstein_to_poly(vs));
+                let ivp = integral_v_dp(vs, poly_deriv(ps));
+                (ps, vs, bernstein_to_poly(ph), bernstein_to_poly(cs), ivp)
+            }
+        };
         Equation {
             rm: R / q.n_c,
             oscillators: [(100.0, q.n_h0), (500.0, q.n_h2), (1000.0, q.n_h3)],
@@ -107,19 +134,11 @@ impl Equation {
             vs,
             phi,
             cubic,
-            ps_t,
+            ps_t: poly_deriv(ps),
             vs_t: poly_deriv(vs),
             phi_t: poly_deriv(phi),
             cubic_t: poly_deriv(cubic),
-            // Integral of VS * dPS/dt, zero at t = 0, as power-series
-            // coefficients.
-            ivp: [
-                0.0,
-                vs[0] * ps_t[0],
-                (vs[0] * ps_t[1] + vs[1] * ps_t[0]) / 2.0,
-                (vs[1] * ps_t[1] + vs[2] * ps_t[0]) / 3.0,
-                vs[2] * ps_t[1] / 4.0,
-            ],
+            ivp,
             q,
         }
     }
@@ -167,10 +186,12 @@ const BRIDGE29: Model = Model {
         n_h0: 2.1914175864177485,
         n_h2: 0.394998044816933,
         n_h3: 7.806688870520927,
-        ps: [-16.476275297992373, 4.908190530393981, 0.06838132520267964],
-        vs: [0.09490898148840093, -0.0046046164216466245, 0.0010524037848080204],
-        ph: [2.145175311983132, 0.17398741013997943, -0.045411054417580005],
-        cs: [1.7821543152798973, 4.111094943821056, 1.1649134148860336],
+        spinodal: Spinodal::Chebyshev {
+            ps: [-16.476275297992373, 4.908190530393981, 0.06838132520267964],
+            vs: [0.09490898148840093, -0.0046046164216466245, 0.0010524037848080204],
+            ph: [2.145175311983132, 0.17398741013997943, -0.045411054417580005],
+            cs: [1.7821543152798973, 4.111094943821056, 1.1649134148860336],
+        },
         e_x: 6213.2180148850275,
         v_x: 0.3185366889545743,
         lg_x: 2.0689886436420397,
@@ -219,8 +240,83 @@ const fn cheb_to_poly(c: [f64; 3]) -> [f64; 3] {
     [c[0] - c[2], c[1], 2.0 * c[2]]
 }
 
-const fn poly_deriv(p: [f64; 3]) -> [f64; 2] {
-    [p[1], 2.0 * p[2]]
+const fn pad(p: [f64; 3]) -> [f64; 5] {
+    [p[0], p[1], p[2], 0.0, 0.0]
+}
+
+const fn poly_deriv(p: [f64; 5]) -> [f64; 4] {
+    [p[1], 2.0 * p[2], 3.0 * p[3], 4.0 * p[4]]
+}
+
+/// C(n, k) as a float; exact for the small arguments used here.
+const fn binomial(n: usize, k: usize) -> f64 {
+    let mut r = 1.0;
+    let mut i = 0;
+    while i < k {
+        r = r * (n - i) as f64 / (i + 1) as f64;
+        i += 1;
+    }
+    r
+}
+
+/// Power-series coefficients in t of sum_k c[k] B_k,4(u), with
+/// u = (T_eff - 100 K) / 320 K = (1 + t) * 5/16. The loops of
+/// `bernstein_to_power` in `watereos/bridge29/equation.py`, in the same
+/// order, so both backends hold the same coefficients.
+const fn bernstein_to_poly(c: [f64; 5]) -> [f64; 5] {
+    let n = 4;
+    let mut a = [0.0; 5];
+    let mut j = 0;
+    while j <= n {
+        let mut s = 0.0;
+        let mut k = 0;
+        while k <= j {
+            let sign = if (j - k) % 2 == 0 { 1.0 } else { -1.0 };
+            s += sign * binomial(j, k) * c[k];
+            k += 1;
+        }
+        a[j] = binomial(n, j) * s;
+        j += 1;
+    }
+    let u_per_t = 100.0 / 320.0;
+    let mut b = [0.0; 5];
+    let mut i = 0;
+    while i <= n {
+        let mut s = 0.0;
+        let mut j = i;
+        while j <= n {
+            let mut power = 1.0;
+            let mut m = 0;
+            while m < j {
+                power *= u_per_t;
+                m += 1;
+            }
+            s += binomial(j, i) * power * a[j];
+            j += 1;
+        }
+        b[i] = s;
+        i += 1;
+    }
+    b
+}
+
+/// Integral of VS * dPS/dt, zero at t = 0, as power-series coefficients:
+/// the loop of `Equation._bernstein` in `watereos/bridge29/equation.py`.
+const fn integral_v_dp(vs: [f64; 5], ps_t: [f64; 4]) -> [f64; 9] {
+    let mut ivp = [0.0; 9];
+    let mut k = 0;
+    while k < 8 {
+        let mut s = 0.0;
+        let mut i = if k >= 3 { k - 3 } else { 0 };
+        let last = if k < 4 { k } else { 4 };
+        while i <= last {
+            s += vs[i] * ps_t[k - i];
+            i += 1;
+        }
+        ivp[k + 1] = s / (k + 1) as f64;
+        k += 1;
+    }
+    ivp
 }
 
 /// Power series c[0] + c[1] t + ... by Horner's rule.

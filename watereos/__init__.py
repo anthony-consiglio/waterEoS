@@ -23,7 +23,7 @@ Or ``getProp()`` for SeaFreeze-compatible grid/scatter input::
     out = getProp(PT, 'holten2014')   # returns grid of shape (3, 3)
 
 Available models: ``'holten2014'``, ``'caupin2019'``, ``'caupin2019_kim'``,
-``'duska2020'``, ``'bridge29'``, ``'local26'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
+``'duska2020'``, ``'bridge29'``, ``'local26'``, ``'bridge37'``, ``'shi_tanaka2020'``, ``'shi_tanaka2020_transport'``,
 ``'grenke2025'``, ``'singh2017'``, ``'singh2017_caupin2019'``,
 ``'singh2017_duska2020'``, ``'water1'``, ``'IAPWS95'``, ``'vapor'``,
 ``'moynihan1996species'``, and ``'mishima2023equation'``, along with the
@@ -86,6 +86,7 @@ def backend(model=None):
                           ('duska2020', 'duska_eos.duska_eos'),
                           ('bridge29', 'watereos.bridge29'),
                           ('local26', 'watereos.local26'),
+                          ('bridge37', 'watereos.bridge37'),
                           ('shi_tanaka2020', 'shi_tanaka_eos.shi_tanaka_eos'),
                           ('vapor', 'vapor_eos.vapor_eos')]:
         try:

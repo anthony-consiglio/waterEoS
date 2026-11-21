@@ -1,11 +1,22 @@
 """Bridge29's two-state Gibbs equation, for any set of its coefficients.
 
-Bridge29 and the local refit Local26 share this functional form and differ
-only in their coefficients (``watereos/data/bridge29.json`` and
-``local26.json``). Pure-state Gibbs derivatives use molar units, K and MPa.
-The public results use the specific SI units of watereos, with bulk moduli
-in MPa.
+Bridge29, the local refit Local26 and Bridge37 share this functional form
+(``watereos/data/bridge29.json``, ``local26.json`` and ``bridge37.json``).
+They differ in their coefficients and, for Bridge37, in the basis of the
+high-density state's four spinodal functions (p_S, V_S, phi and C):
+
+- Bridge29 and Local26: Chebyshev quadratics in t = (T_eff - 200 K)/100 K,
+  coefficients ``ps0``..``ps2``, ``vs0``.., ``ph0``.., ``cs0``..;
+- Bridge37: Bernstein polynomials in u = (T_eff - 100 K)/320 K, coefficients
+  ``psk0``..``psk4``, ``vsk0``.., ``phk0``.., ``csk0``... This is the
+  clamped B-spline on 100-420 K without interior knots of its fit.
+
+Both are converted to power series in t. Pure-state Gibbs derivatives use
+molar units, K and MPa. The public results use the specific SI units of
+watereos, with bulk moduli in MPa.
 """
+from math import comb
+
 import numpy as np
 from numpy.polynomial import Chebyshev, Polynomial
 from scipy.special import xlogy
@@ -18,8 +29,35 @@ R = 8.314462
 P_SCALE = 22.064
 G_SCALE = 461.523 * 647.096 * M
 # Einstein temperatures of the high-density oscillators n_H0, n_H2 and n_H3.
-# Both fitted equations fix the 250 K and 2000 K amplitudes n_H1 and n_H4 to zero.
+# Every fitted equation fixes the 250 K and 2000 K amplitudes n_H1 and n_H4 to zero.
 HIGH_OSCILLATORS = ((100., "n_H0"), (500., "n_H2"), (1000., "n_H3"))
+# The Bernstein basis: u = (T_eff - 100 K)/320 K = (1 + t) * 5/16.
+BERNSTEIN_RANGE_K = (100., 420.)
+_U_PER_T = 100. / (BERNSTEIN_RANGE_K[1] - BERNSTEIN_RANGE_K[0])
+
+
+def bernstein_to_power(c):
+    """Power-series coefficients in t of sum_k c[k] B_k,n(u), n = len(c) - 1.
+
+    Plain floating-point loops in the order of src/bridge29.rs
+    (``bernstein_to_poly``), so that both backends hold the same coefficients.
+    First the coefficients a_j of u^j, a_j = C(n, j) sum_k (-1)^(j-k) C(j, k)
+    c_k; then u^j = (5/16)^j (1 + t)^j, whose powers of 5/16 are exact.
+    """
+    n = len(c) - 1
+    a = []
+    for j in range(n + 1):
+        s = 0.0
+        for k in range(j + 1):
+            s += float((-1)**(j - k) * comb(j, k)) * c[k]
+        a.append(float(comb(n, j)) * s)
+    b = []
+    for i in range(n + 1):
+        s = 0.0
+        for j in range(i, n + 1):
+            s += float(comb(j, i)) * _U_PER_T**j * a[j]
+        b.append(s)
+    return b
 
 
 def _oscillator(T, theta):
@@ -38,6 +76,9 @@ class Equation:
         if Q["n_H1"] or Q["n_H4"]:
             raise ValueError("The 250 K and 2000 K oscillator amplitudes must be zero.")
         self.RM = R / Q["N_c"]
+        if "psk0" in Q:
+            self._bernstein()
+            return
 
         def series(key):
             return Chebyshev([Q[f"{key}{i}"] for i in range(3)]).convert(kind=Polynomial)
@@ -47,6 +88,28 @@ class Equation:
             s.deriv() for s in (self.PS, self.VS, self.PHI, self.CUBIC))
         # Integral of the spinodal volume times the pressure differential.
         self.IVP = (self.VS * self.PS_T).integ()
+
+    def _bernstein(self):
+        """Bridge37's spinodal functions, in the loops of src/bridge29.rs."""
+        Q = self.Q
+        n = sum(1 for key in Q if key.startswith("psk"))
+        power = {key: bernstein_to_power([Q[f"{key}{k}"] for k in range(n)])
+                 for key in ("psk", "vsk", "phk", "csk")}
+        deriv = {key: [i * c[i] for i in range(1, n)] for key, c in power.items()}
+        self.PS, self.VS, self.PHI, self.CUBIC = (
+            Polynomial(power[key]) for key in ("psk", "vsk", "phk", "csk"))
+        self.PS_T, self.VS_T, self.PHI_T, self.CUBIC_T = (
+            Polynomial(deriv[key]) for key in ("psk", "vsk", "phk", "csk"))
+        # Integral of the spinodal volume times the pressure differential,
+        # zero at t = 0 (T_eff = 200 K).
+        vs, ps_t = power["vsk"], deriv["psk"]
+        ivp = [0.0]
+        for k in range(len(vs) + len(ps_t) - 1):
+            s = 0.0
+            for i in range(max(0, k - len(ps_t) + 1), min(k, len(vs) - 1) + 1):
+                s += vs[i] * ps_t[k - i]
+            ivp.append(s / (k + 1))
+        self.IVP = Polynomial(ivp)
 
     def low(self, T, P):
         Q = self.Q
