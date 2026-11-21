@@ -207,6 +207,7 @@ REFERENCES = {
 MODEL_REFERENCES = {
     'bridge29': ['bridge29'],
     'local26': ['bridge29'],
+    'bridge37': ['bridge29'],
     'duska2020': ['duska2020'],
     'holten2014': ['holten2014'],
     'caupin2019': ['caupin2019'],

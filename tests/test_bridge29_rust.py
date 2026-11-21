@@ -1,7 +1,8 @@
 """
-The Rust backend of Bridge29's equation (src/bridge29.rs, src/local26.rs)
-against the NumPy core (watereos/bridge29/equation.py), for Bridge29 and
-for Local26, which shares its form.
+The Rust backend of Bridge29's equation (src/bridge29.rs, src/local26.rs,
+src/bridge37.rs) against the NumPy core (watereos/bridge29/equation.py), for
+Bridge29 and for Local26 and Bridge37, which share its form (Bridge37 with
+quartic spinodal functions in a Bernstein basis).
 
 Both evaluate the same operations; NumPy takes second derivatives of the
 high-density state by a complex step and Rust by dual numbers, which give
@@ -13,14 +14,15 @@ only next to a singular point:
 - the fold of that state's expansion b d^2 + c d^3 = 1 - p/p_S where c < 0
   (Local26 below 160 K), where the cubic has a double root and the state's
   compressibility diverges.
-The first-derivative properties agree to about 1e-12 everywhere, and so do
+The first-derivative properties agree to about 2e-12 everywhere, and so do
 the second-derivative ones away from those points; measured on a 0.5 K by
-1 MPa grid, the second-derivative ones differ by up to 1e-12 where the
-normalized measures below are 0.2 or more (mixing curvature) and 0.8 or
-less (fold ratio), and by up to 6e-10 for Bridge29 and 1.4e-7 for Local26
-as they approach a singular point.
+1 MPa grid at 100-400 K and -200 to 400 MPa, the second-derivative ones
+differ by up to 2e-12 where the normalized measures below are 0.2 or more
+(mixing curvature) and 0.8 or less (fold ratio), and by up to 6e-10 for
+Bridge29, 1.4e-7 for Local26 and 7e-11 for Bridge37 as they approach a
+singular point.
 
-Skipped if the installed watereos_rs has neither model.
+Skipped if the installed watereos_rs has none of the three models.
 """
 import importlib
 
@@ -31,10 +33,10 @@ rs = pytest.importorskip('watereos_rs')
 
 from watereos import backend  # noqa: E402
 
-MODELS = [m for m in ('bridge29', 'local26') if hasattr(rs, f'compute_batch_{m}')]
+MODELS = [m for m in ('bridge29', 'local26', 'bridge37') if hasattr(rs, f'compute_batch_{m}')]
 if not MODELS:
-    pytest.skip('installed watereos_rs has neither compute_batch_bridge29 nor '
-                'compute_batch_local26', allow_module_level=True)
+    pytest.skip('installed watereos_rs has none of compute_batch_bridge29, '
+                'compute_batch_local26 and compute_batch_bridge37', allow_module_level=True)
 
 SECOND = ('Cp', 'Cv', 'Kt', 'Ks', 'alpha', 'vel')
 
@@ -46,10 +48,10 @@ def _modules(model):
 
 
 def _grid():
-    """100-400 K and -140 to 400 MPa, including points beyond the vapor
+    """100-400 K and -200 to 400 MPa, including points beyond the vapor
     spinodal of the high-density state (NaN in both backends)."""
     T, P = np.meshgrid(np.arange(100.0, 400.01, 2.5),
-                       np.arange(-140.0, 400.01, 5.0))
+                       np.arange(-200.0, 400.01, 5.0))
     return T.ravel(), P.ravel()
 
 

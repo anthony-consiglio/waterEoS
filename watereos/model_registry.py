@@ -184,6 +184,15 @@ MODEL_REGISTRY = {
         T_min=100, T_max=400, P_min=-200, P_max=400,
         properties=[k for k in TRANSPORT_PROPS if k.split('_')[0] != 'Kp'],
     ),
+    'bridge37': ModelInfo(
+        display_name='Bridge37 (Consiglio)',
+        model_key='bridge37', is_two_state=True, has_phase_diagram=True, has_transport=False,
+        # The scope of the fit. Below the homogeneous nucleation line the
+        # liquid branches are continuations constrained by amorphous-water
+        # data, as for Bridge29.
+        T_min=100, T_max=400, P_min=-140, P_max=400,
+        properties=[k for k in TWO_STATE_PROPS if k.split('_')[0] != 'Kp'],
+    ),
     'local26': ModelInfo(
         display_name='Local26 (Consiglio)',
         model_key='local26', is_two_state=True, has_phase_diagram=True, has_transport=False,
@@ -431,7 +440,7 @@ MODEL_REGISTRY.update(_MODEL_WATERS)
 
 # Ordered list for consistent UI display: real water first, model waters last
 MODEL_ORDER = [
-    'duska2020', 'bridge29', 'local26', 'holten2014', 'caupin2019', 'caupin2019_kim',
+    'duska2020', 'bridge29', 'bridge37', 'local26', 'holten2014', 'caupin2019', 'caupin2019_kim',
     'shi_tanaka2020', 'shi_tanaka2020_transport',
     'grenke2025', 'singh2017', 'singh2017_caupin2019', 'singh2017_duska2020',
     'moynihan1996species', 'mishima2023equation',

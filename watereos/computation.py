@@ -288,6 +288,8 @@ def compute_phase_diagram_data(model_key, n_pressures=150,
         from .bridge29.phase import find_LLCP
     elif model_key == 'local26':
         from .local26.phase import find_LLCP
+    elif model_key == 'bridge37':
+        from .bridge37.phase import find_LLCP
     elif model_key == 'duska2020':
         from duska_eos.phase_diagram import find_LLCP
     elif model_key == 'holten2014':
@@ -346,6 +348,8 @@ def _get_compute_batch(model_key):
         from .bridge29.core import compute_batch
     elif model_key == 'local26':
         from .local26.core import compute_batch
+    elif model_key == 'bridge37':
+        from .bridge37.core import compute_batch
     elif model_key == 'caupin2019':
         from caupin_eos.core import compute_batch
     elif model_key == 'caupin2019_kim':
@@ -867,7 +871,7 @@ def compute_property_at_forced_x(model_key, prop_key, T_arr, P_arr, x_arr):
     Uses model-specific compute_properties_at_x (includes excess volume).
     Returns 1-D array of property values, or None if not supported.
     """
-    if model_key in ("bridge29", "local26"):
+    if model_key in ("bridge29", "local26", "bridge37"):
         from importlib import import_module
         compute_batch = import_module(f"watereos.{model_key}.core").compute_batch
         return compute_batch(T_arr, P_arr, x=np.asarray(x_arr)).get(prop_key)

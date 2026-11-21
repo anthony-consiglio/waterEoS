@@ -24,18 +24,20 @@ import numpy as np
 import pytest
 
 MODELS = ['holten2014', 'caupin2019', 'caupin2019_kim', 'duska2020', 'bridge29',
-          'local26']
+          'local26', 'bridge37']
 BRANCHES = ['stable', 'hdl', 'ldl']
 
 _PACKAGE = {'holten2014': 'holten_eos', 'caupin2019': 'caupin_eos',
             'caupin2019_kim': 'caupin_eos', 'duska2020': 'duska_eos',
-            'bridge29': 'watereos.bridge29', 'local26': 'watereos.local26'}
+            'bridge29': 'watereos.bridge29', 'local26': 'watereos.local26',
+            'bridge37': 'watereos.bridge37'}
 _RUST_NAME = {'holten2014': 'compute_batch_holten',
               'caupin2019': 'compute_batch_caupin',
               'caupin2019_kim': 'compute_batch_caupin_kim',
               'duska2020': 'compute_batch_duska',
               'bridge29': 'compute_batch_bridge29',
-              'local26': 'compute_batch_local26'}
+              'local26': 'compute_batch_local26',
+              'bridge37': 'compute_batch_bridge37'}
 
 # Finite-difference steps (five-point stencil) and tolerances.  With these
 # steps the truncation and rounding errors of the stencil are below

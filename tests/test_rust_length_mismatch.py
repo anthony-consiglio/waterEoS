@@ -29,7 +29,7 @@ def _pairs():
 
 
 @pytest.mark.parametrize("name", ["caupin", "caupin_kim", "holten", "duska",
-                                  "bridge29", "local26", "shi_tanaka",
+                                  "bridge29", "local26", "bridge37", "shi_tanaka",
                                   "vapor"])
 def test_batch_rejects_unequal_lengths(name):
     batch = getattr(watereos_rs, f"compute_batch_{name}")
